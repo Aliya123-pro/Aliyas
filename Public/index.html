@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finoana Claim – Connexion</title>
+    <style>
+        :root {
+            --bg: #f0f4f8;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+            --transition: 0.2s ease;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #eef2ff 0%, #f4f6f9 100%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+        .login-container {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 420px;
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .logo-icon { font-size: 2.2rem; margin-bottom: 6px; color: var(--primary); }
+        .logo h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
+        .logo p { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
+
+        /* Panneaux coulissants */
+        .panel {
+            transition: transform 0.4s ease, opacity 0.3s ease;
+            width: 100%;
+        }
+        .login-panel {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .signup-panel {
+            position: absolute;
+            top: 120px;
+            left: 36px;
+            right: 36px;
+            transform: translateX(120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .container.signup-active .login-panel {
+            transform: translateX(-120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .container.signup-active .signup-panel {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+            position: relative;
+            top: 0;
+        }
+
+        .form-group { margin-bottom: 20px; position: relative; }
+
+        /* Connexion : labels fixes */
+        .login-panel .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text);
+        }
+        .login-panel .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            background: #fafbfc;
+            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+            color: var(--text);
+        }
+        .login-panel .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            background: #fff;
+        }
+
+        /* Inscription : labels flottants améliorés */
+        .signup-panel .form-group {
+            margin-bottom: 26px;
+        }
+        .signup-panel .form-group label {
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            pointer-events: none;
+            transition: all 0.2s ease;
+            background: transparent;
+            padding: 0 4px;
+            transform-origin: left top;
+            z-index: 1;
+        }
+        .signup-panel .form-group input {
+            width: 100%;
+            padding: 18px 16px 10px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            background: #fafbfc;
+            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+            color: var(--text);
+            position: relative;
+            z-index: 0;
+        }
+        .signup-panel .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            background: #fff;
+        }
+        /* Déplacement du label quand l'input est focus ou rempli */
+        .signup-panel .form-group input:focus + label,
+        .signup-panel .form-group input:not(:placeholder-shown) + label {
+            top: -10px;
+            left: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: #fff;
+            padding: 0 6px;
+            border-radius: 4px;
+            z-index: 2;
+        }
+        .signup-panel .form-group input::placeholder {
+            color: transparent;
+        }
+
+        .password-wrapper { position: relative; }
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--text-light);
+            padding: 4px;
+            transition: color var(--transition);
+            z-index: 2;
+        }
+        .toggle-password:hover { color: var(--primary); }
+
+        .error-message, .success-message {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            display: none;
+            line-height: 1.4;
+        }
+        .error-message { color: var(--danger); }
+        .success-message { color: var(--success); font-weight: 500; }
+        .visible { display: block; }
+
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            background: var(--primary);
+            color: white;
+            transition: background var(--transition), transform var(--transition);
+            letter-spacing: 0.3px;
+            margin-top: 12px;
+        }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
+
+        .toggle-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-light); }
+        .toggle-link a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .toggle-link a:hover { text-decoration: underline; }
+
+        .forgot-password { text-align: right; margin-bottom: 6px; }
+        .forgot-password a { font-size: 0.8rem; color: var(--primary); text-decoration: none; }
+        .forgot-password a:hover { text-decoration: underline; }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .version { text-align: center; margin-top: 24px; font-size: 0.7rem; color: var(--text-light); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="login-container container" id="mainContainer">
+        <div class="logo">
+            <div class="logo-icon">⚙️</div>
+            <h1>Finoana Claim</h1>
+            <p id="formDescription">Connectez-vous à votre compte</p>
+        </div>
+
+        <!-- Panneau Connexion -->
+        <div class="panel login-panel" id="loginPanel">
+            <form id="loginForm" novalidate>
+                <div class="form-group">
+                    <label for="loginEmail">Adresse email</label>
+                    <input type="email" id="loginEmail" placeholder="vous@exemple.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Mot de passe</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+                        <button type="button" class="toggle-password" data-target="loginPassword">👁️</button>
+                    </div>
+                    <div class="forgot-password">
+                        <a href="#" id="forgotPasswordLink">Mot de passe oublié ?</a>
+                    </div>
+                </div>
+                <div class="error-message" id="loginError"></div>
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    <span id="loginBtnText">Se connecter</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Panneau Inscription -->
+        <div class="panel signup-panel" id="signupPanel">
+            <form id="signupForm" novalidate>
+                <div class="form-group">
+                    <label for="signupUsername">Nom d'utilisateur</label>
+                    <input type="text" id="signupUsername" placeholder=" " required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="signupEmail">Adresse email</label>
+                    <input type="email" id="signupEmail" placeholder=" " required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Mot de passe</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="signupPassword" placeholder=" " required autocomplete="new-password">
+                        <button type="button" class="toggle-password" data-target="signupPassword">👁️</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="signupConfirmPassword">Confirmer le mot de passe</label>
+                    <input type="password" id="signupConfirmPassword" placeholder=" " required autocomplete="new-password">
+                </div>
+                <div class="error-message" id="signupError"></div>
+                <div class="success-message" id="signupSuccess"></div>
+                <button type="submit" class="btn-primary" id="signupBtn">
+                    <span id="signupBtnText">Créer un compte</span>
+                </button>
+            </form>
+        </div>
+
+        <div class="toggle-link">
+            <span id="toggleText">Pas encore de compte ?</span>
+            <a href="#" id="toggleAuth">Créer un compte</a>
+        </div>
+
+        <div class="version">v2.0 · Interface sécurisée</div>
+    </div>
+
+    <script>
+        (function() {
+            let mode = 'login';
+
+            const container = document.getElementById('mainContainer');
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const loginEmail = document.getElementById('loginEmail');
+            const loginPassword = document.getElementById('loginPassword');
+            const signupUsername = document.getElementById('signupUsername');
+            const signupEmail = document.getElementById('signupEmail');
+            const signupPassword = document.getElementById('signupPassword');
+            const signupConfirmPassword = document.getElementById('signupConfirmPassword');
+            const loginError = document.getElementById('loginError');
+            const signupError = document.getElementById('signupError');
+            const signupSuccess = document.getElementById('signupSuccess');
+            const loginBtn = document.getElementById('loginBtn');
+            const loginBtnText = document.getElementById('loginBtnText');
+            const signupBtn = document.getElementById('signupBtn');
+            const signupBtnText = document.getElementById('signupBtnText');
+            const toggleAuthLink = document.getElementById('toggleAuth');
+            const toggleText = document.getElementById('toggleText');
+            const formDescription = document.getElementById('formDescription');
+            const forgotPasswordLink = document.getElementById('forgotPasswordLink');
+
+            // Gestion des yeux pour afficher/masquer le mot de passe
+            document.querySelectorAll('.toggle-password').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const input = document.getElementById(targetId);
+                    const isPass = input.type === 'password';
+                    input.type = isPass ? 'text' : 'password';
+                    btn.textContent = isPass ? '🙈' : '👁️';
+                });
+            });
+
+            function switchMode(newMode) {
+                mode = newMode;
+                loginError.classList.remove('visible');
+                signupError.classList.remove('visible');
+                signupSuccess.classList.remove('visible');
+
+                if (mode === 'login') {
+                    container.classList.remove('signup-active');
+                    formDescription.textContent = 'Connectez-vous à votre compte';
+                    toggleText.textContent = 'Pas encore de compte ?';
+                    toggleAuthLink.textContent = 'Créer un compte';
+                } else {
+                    container.classList.add('signup-active');
+                    formDescription.textContent = 'Créez votre compte';
+                    toggleText.textContent = 'Déjà un compte ?';
+                    toggleAuthLink.textContent = 'Se connecter';
+                }
+            }
+
+            toggleAuthLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                switchMode(mode === 'login' ? 'signup' : 'login');
+            });
+
+            function isValidEmail(email) {
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+            }
+
+            // Connexion
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                loginError.classList.remove('visible');
+
+                const email = loginEmail.value.trim();
+                const password = loginPassword.value;
+
+                if (!isValidEmail(email)) {
+                    loginError.textContent = 'Adresse email invalide.';
+                    loginError.classList.add('visible');
+                    return;
+                }
+                if (password.length < 6) {
+                    loginError.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+                    loginError.classList.add('visible');
+                    return;
+                }
+
+                loginBtn.disabled = true;
+                loginBtnText.innerHTML = '<span class="spinner"></span> Patientez…';
+
+                try {
+                    const response = await fetch('/api/auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, mode: 'login' })
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        loginError.textContent = data.error || 'Identifiants incorrects';
+                        loginError.classList.add('visible');
+                        loginBtn.disabled = false;
+                        loginBtnText.textContent = 'Se connecter';
+                        return;
+                    }
+
+                    localStorage.setItem('auth_token', data.token);
+                    window.location.href = '/dashboard.html';
+                } catch (err) {
+                    loginError.textContent = 'Erreur réseau.';
+                    loginError.classList.add('visible');
+                    loginBtn.disabled = false;
+                    loginBtnText.textContent = 'Se connecter';
+                }
+            });
+
+            // Inscription
+            signupForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                signupError.classList.remove('visible');
+                signupSuccess.classList.remove('visible');
+
+                const username = signupUsername.value.trim();
+                const email = signupEmail.value.trim();
+                const password = signupPassword.value;
+                const confirmPassword = signupConfirmPassword.value;
+
+                if (!username) {
+                    signupError.textContent = 'Le nom d\'utilisateur est requis.';
+                    signupError.classList.add('visible');
+                    return;
+                }
+                if (!isValidEmail(email)) {
+                    signupError.textContent = 'Adresse email invalide.';
+                    signupError.classList.add('visible');
+                    return;
+                }
+                if (password.length < 6) {
+                    signupError.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+                    signupError.classList.add('visible');
+                    return;
+                }
+                if (password !== confirmPassword) {
+                    signupError.textContent = 'Les mots de passe ne correspondent pas.';
+                    signupError.classList.add('visible');
+                    return;
+                }
+
+                signupBtn.disabled = true;
+                signupBtnText.innerHTML = '<span class="spinner"></span> Patientez…';
+
+                try {
+                    const response = await fetch('/api/auth', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password, confirmPassword, username, mode: 'signup' })
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        signupError.textContent = data.error || 'Erreur lors de l\'inscription';
+                        signupError.classList.add('visible');
+                        signupBtn.disabled = false;
+                        signupBtnText.textContent = 'Créer un compte';
+                        return;
+                    }
+
+                    signupSuccess.textContent = '✅ Compte créé avec succès ! Vous pouvez maintenant vous connecter.';
+                    signupSuccess.classList.add('visible');
+
+                    signupUsername.value = '';
+                    signupEmail.value = '';
+                    signupPassword.value = '';
+                    signupConfirmPassword.value = '';
+
+                    setTimeout(() => {
+                        switchMode('login');
+                    }, 2000);
+                } catch (err) {
+                    signupError.textContent = 'Erreur réseau.';
+                    signupError.classList.add('visible');
+                } finally {
+                    signupBtn.disabled = false;
+                    signupBtnText.textContent = 'Créer un compte';
+                }
+            });
+
+         

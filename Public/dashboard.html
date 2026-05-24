@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard – Finoana Auto Claim</title>
+    <style>
+        :root {
+            --bg: #f0f4f8; --card-bg: #ffffff; --primary: #2563eb; --primary-hover: #1d4ed8;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --text: #1e293b; --text-secondary: #64748b; --border: #e2e8f0;
+            --radius: 12px; --shadow: 0 8px 24px rgba(0, 0, 0, 0.06); --transition: 0.2s ease;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #eef2ff 0%, #f4f6f9 100%);
+            color: var(--text); font-size: 0.85rem; line-height: 1.4; min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .header {
+            background: var(--card-bg); padding: 12px 24px; box-shadow: var(--shadow);
+            display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        }
+        .header h1 { font-size: 1.2rem; font-weight: 700; display: flex; align-items: center; gap: 6px; color: var(--text); }
+        .btn {
+            padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+            font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;
+            transition: background var(--transition), transform var(--transition); text-decoration: none; white-space: nowrap;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn-danger { background: var(--danger); color: white; }
+        .container { max-width: 800px; margin: 20px auto; padding: 0 16px; }
+        .card {
+            background: var(--card-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+            padding: 16px; margin-bottom: 16px;
+        }
+        .card h2 { font-size: 1rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+        .accounts-list { display: flex; flex-direction: column; gap: 8px; }
+        .account-item {
+            display: flex; align-items: center; justify-content: space-between; padding: 10px 12px;
+            background: #f8fafc; border-radius: 6px; border: 1px solid var(--border); flex-wrap: wrap; gap: 10px;
+        }
+        .account-info { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; flex: 1; }
+        .account-email { font-weight: 600; font-size: 0.9rem; min-width: 150px; cursor: pointer; }
+        .account-email:hover { color: var(--primary); text-decoration: underline; }
+        .account-site {
+            color: var(--text-secondary); font-size: 0.8rem; background: #e2e8f0; padding: 2px 8px; border-radius: 4px;
+        }
+        .account-countdown {
+            font-weight: 700; font-variant-numeric: tabular-nums; color: var(--primary); font-size: 0.85rem; min-width: 60px;
+        }
+        .account-countdown.expired { color: var(--danger); }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; margin-left: 8px;
+        }
+        .badge-failed { background: #fee2e2; color: #991b1b; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px; border: 2px solid var(--border);
+            border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .toast {
+            position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white;
+            padding: 10px 20px; border-radius: 6px; font-weight: 500; font-size: 0.8rem; z-index: 2000;
+            opacity: 0; transform: translateX(80px); transition: all 0.3s ease; max-width: 300px;
+        }
+        .toast.show { opacity: 1; transform: translateX(0); }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .modal-overlay {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--card-bg); border-radius: var(--radius); padding: 20px;
+            width: 90%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: fadeSlide 0.2s ease;
+        }
+        @keyframes fadeSlide { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        .modal h3 { font-size: 1rem; margin-bottom: 16px; color: var(--text); }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.8rem; color: var(--text); }
+        .form-group input, .form-group select {
+            width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+            font-size: 0.85rem; transition: border var(--transition); background: #fafbfc; outline: none;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); background: #fff;
+        }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+
+        /* Modale historique */
+        .history-modal {
+            display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .history-modal.active { display: flex; }
+        .history-content {
+            background: var(--card-bg); border-radius: var(--radius); padding: 20px;
+            width: 90%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            animation: fadeSlide 0.2s ease;
+        }
+        .history-content p { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1 id="welcomeMessage">⚙️ Chargement...</h1>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-primary" id="btnAddAccount">➕ Ajouter un compte</button>
+            <button class="btn btn-outline" id="logoutBtn">🚪 Déconnexion</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="card">
+            <h2>📋 Mes comptes</h2>
+            <div id="accountsContainer" class="accounts-list"></div>
+            <div style="text-align:center; margin-top:12px;">
+                <button class="btn btn-outline" id="refreshBtn">🔄 Rafraîchir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modale Ajout -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3 id="modalTitle">➕ Nouveau compte</h3>
+            <form id="accountForm">
+                <input type="hidden" id="editIndex" value="-1">
+                <div class="form-group"><label>Email</label><input type="email" id="email" required placeholder="exemple@mail.com"></div>
+                <div class="form-group"><label>Mot de passe</label><input type="password" id="password" required placeholder="••••••••"></div>
+                <div class="form-group"><label>Plateforme</label><select id="platform">
+                    <option value="tronpick">TronPick</option><option value="litepick">LitePick</option>
+                    <option value="dogepick">DogePick</option><option value="solpick">SolPick</option><option value="bnbpick">BnBPick</option>
+               <option value="tonpick">TonPick</option><option value="suipick">SuiPick</option><option value="polpick">PolPick</option>
+                
+                </select></div>
+                <div class="form-group"><label>Timer initial (mm:ss)</label><input type="text" id="initialTimer" placeholder="60:00" pattern="[0-9]{1,2}:[0-5][0-9]"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" id="btnCancel">Annuler</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmit">💾 Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modale Historique -->
+    <div class="history-modal" id="historyModal">
+        <div class="history-content">
+            <h3>📊 Historique 24h</h3>
+            <p id="historyEmail"></p>
+            <p id="historySuccess">Chargement...</p>
+            <p id="historyBonus"></p>
+            <button class="btn btn-primary" onclick="document.getElementById('historyModal').classList.remove('active')">Fermer</button>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        function initWhenSupabaseReady() {
+            if (typeof window.supabase === 'undefined') {
+                setTimeout(initWhenSupabaseReady, 300);
+                return;
+            }
+            fetch('/api/config')
+                .then(res => res.json())
+                .then(config => {
+                    const supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+                    startDashboard(supabase, config);
+                })
+                .catch(err => {
+                    document.getElementById('welcomeMessage').textContent = 'Erreur de configuration';
+                });
+        }
+
+        function startDashboard(supabase, config) {
+            const GH_USERNAME = config.ghUsername;
+            const GH_REPO = config.ghRepo;
+            const BRANCH = config.ghBranch || 'main';
+
+            const btnAdd = document.getElementById('btnAddAccount');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const modal = document.getElementById('modalOverlay');
+            const btnCancel = document.getElementById('btnCancel');
+            const form = document.getElementById('accountForm');
+            const toast = document.getElementById('toast');
+            const accountsContainer = document.getElementById('accountsContainer');
+            const welcomeMessage = document.getElementById('welcomeMessage');
+
+            let currentUserId = null;
+            let currentAccounts = [];
+            let countdownIntervals = [];
+
+            function showToast(msg, type = '') {
+                toast.textContent = msg;
+                toast.className = `toast ${type} show`;
+                setTimeout(() => { toast.className = 'toast'; }, 5000);
+            }
+
+            function minutesToTimeStr(minutes) {
+                if (isNaN(minutes)) return '0:00';
+                const totalSeconds = Math.floor(minutes * 60);
+                const mins = Math.floor(totalSeconds / 60);
+                const secs = totalSeconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            }
+
+            function timeStrToMinutes(str) {
+                if (!str || !str.includes(':')) return 60;
+                const [mins, secs] = str.split(':').map(Number);
+                return (mins || 0) + (secs || 0) / 60;
+            }
+
+            function showLoader(accountElement) {
+                const info = accountElement.querySelector('.account-info');
+                if (info && !info.querySelector('.spinner')) {
+                    const spinner = document.createElement('span');
+                    spinner.className = 'spinner';
+                    info.prepend(spinner);
+                }
+            }
+
+            function hideLoader(accountElement) {
+                const spinner = accountElement.querySelector('.spinner');
+                if (spinner) spinner.remove();
+            }
+
+            async function getUserId() {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/index.html';
+                    return null;
+                }
+                try {
+                    const { data: { user }, error } = await supabase.auth.getUser(token);
+                    if (error) throw error;
+                    const username = user.user_metadata?.username || user.email;
+                    welcomeMessage.textContent = `Bienvenue, ${username}`;
+                    return user.id;
+                } catch (e) {
+                    showToast('Session expirée. Redirection...', 'error');
+                    localStorage.removeItem('auth_token');
+                    setTimeout(() => { window.location.href = '/index.html'; }, 1500);
+                    return null;
+                }
+            }
+
+            const LOGIN_WORKFLOW_ID = 'test-account.yml';
+            const LOGOUT_WORKFLOW_ID = 'logout.yml';
+
+            async function githubApi(method, path, body = null, isList = false) {
+                let url = `/api/data?path=${encodeURIComponent(path)}&userId=${currentUserId}`;
+                if (isList) {
+                    url = `/api/data?path=/&userId=${currentUserId}`;
+                }
+                const options = { method, headers: { 'Content-Type': 'application/json' } };
+                if (body) options.body = JSON.stringify(body);
+                const res = await fetch(url, options);
+                if (res.status === 204) return {};
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+                return data;
+            }
+
+            async function loadAccounts() {
+                try {
+                    const files = await githubApi('GET', '/', null, true);
+                    if (!Array.isArray(files)) return [];
+
+                    const accounts = [];
+                    for (const file of files) {
+                        if (!file.name.startsWith(`account_${currentUserId}_`)) continue;
+                        const filePath = `/repos/${GH_USERNAME}/${GH_REPO}/contents/${file.name}`;
+                        const fileData = await githubApi('GET', filePath);
+                        const content = atob(fileData.content);
+                        try {
+                            const account = JSON.parse(content);
+                            accounts.push(account);
+                        } catch (e) {}
+                    }
+                    return accounts;
+                } catch (e) {
+                    if (e.message && e.message.includes('404')) return [];
+                    throw e;
+                }
+            }
+
+            async function triggerWorkflow(workflowId, inputs) {
+                const apiPath = `/repos/${GH_USERNAME}/${GH_REPO}/actions/workflows/${workflowId}/dispatches`;
+                const payload = { ref: BRANCH, inputs };
+                await githubApi('POST', apiPath, payload);
+            }
+
+            function openModal(title, account = null) {
+                document.getElementById('modalTitle').textContent = title;
+                if (account) {
+                    document.getElementById('editIndex').value = currentAccounts.indexOf(account);
+                    document.getElementById('email').value = account.email || '';
+                    document.getElementById('password').value = account.password || '';
+                    document.getElementById('platform').value = account.platform || 'tronpick';
+                    document.getElementById('initialTimer').value = minutesToTimeStr(account.timer || 60);
+                } else {
+                    document.getElementById('editIndex').value = '-1';
+                    form.reset();
+                    document.getElementById('platform').value = 'tronpick';
+                    document.getElementById('initialTimer').value = '60:00';
+                }
+                modal.classList.add('active');
+            }
+
+            function closeModal() { modal.classList.remove('active'); }
+
+            function renderAccounts() {
+                countdownIntervals.forEach(clearInterval);
+                countdownIntervals = [];
+                accountsContainer.innerHTML = '';
+
+                const visibleAccounts = currentAccounts.filter(acc => acc.cookiesStatus !== 'failed');
+                if (!visibleAccounts.length) {
+                    accountsContainer.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-secondary);">Aucun compte configuré.</div>';
+                    return;
+                }
+                visibleAccounts.forEach((acc, idx) => {
+                    const now = Date.now();
+                    const last = acc.lastClaim || 0;
+                    const intervalMs = (acc.timer || 60) * 60 * 1000;
+                    const nextClaimTime = last + intervalMs;
+                    let remainingMs = Math.max(0, nextClaimTime - now);
+
+                    const formatTime = (ms) => {
+                        if (ms <= 0) return '0:00';
+                        const totalSeconds = Math.floor(ms / 1000);
+                        const mins = Math.floor(totalSeconds / 60);
+                        const secs = totalSeconds % 60;
+                        return `${mins}:${secs.toString().padStart(2, '0')}`;
+                    };
+
+                    const isFailed = acc.cookiesStatus === 'failed';
+                    const item = document.createElement('div');
+                    item.className = 'account-item';
+                    item.dataset.index = idx;
+                    item.innerHTML = `
+                        <div class="account-info">
+                            <span class="account-email">${acc.email}</span>
+                            <span class="account-site">${acc.platform || 'tronpick'}</span>
+                            <span class="account-countdown" id="cd-${idx}">${isFailed ? 'Échec' : formatTime(remainingMs)}</span>
+                            ${isFailed ? '<span class="badge badge-failed">Échec</span>' : ''}
+                        </div>
+                        <button class="btn btn-outline btn-delete" title="Supprimer le compte">🗑️</button>
+                    `;
+                    accountsContainer.appendChild(item);
+
+                    if (!isFailed) {
+                        const interval = setInterval(() => {
+                            const n = Date.now();
+                            const r = Math.max(0, nextClaimTime - n);
+                            const sp = document.getElementById(`cd-${idx}`);
+                            if (sp) {
+                                sp.textContent = formatTime(r);
+                                sp.className = 'account-countdown' + (r === 0 ? ' expired' : '');
+                            }
+                        }, 1000);
+                        countdownIntervals.push(interval);
+                    }
+                });
+
+                document.querySelectorAll('.btn-delete').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const item = btn.closest('.account-item');
+                        const idx = parseInt(item.dataset.index);
+                        const acc = visibleAccounts[idx];
+                        if (!confirm(`Supprimer définitivement ${acc.email} ?`)) return;
+
+                        showLoader(item);
+                        btn.disabled = true;
+                        let secondsLeft = 90;
+                        btn.innerHTML = '<span class="spinner"></span> 90s';
+
+                        const countdownInt

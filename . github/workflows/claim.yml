@@ -1,0 +1,57 @@
+name: Claim Tronpick Faucet
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      userId:
+        required: true
+        type: string
+
+jobs:
+  claim:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Installer les dépendances système
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+        
+      - name: Installer les packages Node
+        run: npm install puppeteer-real-browser @octokit/rest puppeteer-screen-recorder
+        
+      - name: Exécuter le claim
+        env:
+          CLAIM_EMAIL: ${{ github.event.inputs.email }}
+          CLAIM_PLATFORM: ${{ github.event.inputs.platform }}
+          USER_ID: ${{ github.event.inputs.userId }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          GH_BRANCH: ${{ secrets.GH_BRANCH || 'main' }}
+          JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
+          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
+        run: xvfb-run --auto-servernum node script.js
+        
+      - name: Upload des captures d'écran
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-${{ github.event.inputs.email }}-${{ github.event.inputs.platform }}
+          path: screenshots/
+          
+      - name: Upload des vidéos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: videos-${{ github.event.inputs.email }}-${{ github.event.inputs.platform }}
+          path: videos/

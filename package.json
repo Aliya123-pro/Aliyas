@@ -1,0 +1,18 @@
+{
+  "name": "tronpick-faucet",
+  "version": "1.0.0",
+  "description": "Auto claim for Tronpick and similar faucets",
+  "main": "script.js",
+  "scripts": {
+    "claim": "node script.js",
+    "test-login": "node test-login-workflow.js",
+    "logout": "node logout.js"
+  },
+  "dependencies": {
+    "@octokit/rest": "^20.0.0",
+    "puppeteer-real-browser": "^1.0.0",
+    "puppeteer-screen-recorder": "^2.1.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

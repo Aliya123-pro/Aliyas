@@ -1,0 +1,96 @@
+name: Test Account Login
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: "Adresse email du compte"
+        required: true
+        type: string
+      password:
+        description: "Mot de passe du compte"
+        required: true
+        type: string
+      platform:
+        description: "Plateforme (ex: tronpick)"
+        required: true
+        type: string
+      proxyIndex:
+        description: "Index du proxy (0 par défaut)"
+        required: false
+        type: string
+      initialTimer:
+        description: "Timer initial (format mm:ss)"
+        required: false
+        type: string
+        default: "60:00"
+      action:
+        description: "Action (login)"
+        required: false
+        type: string
+        default: "login"
+      userId:
+        description: "Identifiant utilisateur (optionnel)"
+        required: false
+        type: string
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Cache des dépendances npm
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      # Cache du navigateur Chromium (téléchargé par Puppeteer)
+      - name: Cache Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: ${{ runner.os }}-puppeteer-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-puppeteer-
+
+      # Installation des dépendances système (xvfb pour l'affichage, ffmpeg pour la vidéo)
+      - name: Installer les dépendances système
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb ffmpeg
+
+      - name: Installer les dépendances Node
+        run: npm install puppeteer-real-browser @octokit/rest
+
+      - name: Exécuter le script de login
+        env:
+          DISPLAY: ":99"
+          TEST_EMAIL: ${{ github.event.inputs.email }}
+          TEST_PASSWORD: ${{ github.event.inputs.password }}
+          TEST_PLATFORM: ${{ github.event.inputs.platform }}
+          TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex }}
+          TEST_INITIAL_TIMER: ${{ github.event.inputs.initialTimer }}
+          TEST_ACTION: ${{ github.event.inputs.action }}
+          USER_ID: ${{ github.event.inputs.userId }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          GH_BRANCH: ${{ secrets.GH_BRANCH || 'main' }}
+          JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
+          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}   # <-- indispensable pour le chiffrement
+        run: xvfb-run --auto-servernum node test-login-workflow.js
+
+      # Optionnel : sauvegarde des vidéos pour déboguer
+      - name: Upload des vidéos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: login-videos
+          path: videos/

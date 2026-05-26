@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Finoana Claim – Connexion</title>
     <style>
-        /* … tout le CSS d'origine … */
         :root {
             --bg: #f0f4f8;
             --card-bg: #ffffff;
@@ -43,65 +42,166 @@
             position: relative;
             overflow: hidden;
         }
-        .logo { text-align: center; margin-bottom: 28px; }
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
         .logo-icon { font-size: 2.2rem; margin-bottom: 6px; color: var(--primary); }
         .logo h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
         .logo p { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
 
-        .panel { transition: transform 0.4s ease, opacity 0.3s ease; width: 100%; }
-        .login-panel { transform: translateX(0); opacity: 1; }
-        .signup-panel {
-            position: absolute; top: 120px; left: 36px; right: 36px;
-            transform: translateX(120%); opacity: 0; pointer-events: none;
+        /* Panneaux coulissants */
+        .panel {
+            transition: transform 0.4s ease, opacity 0.3s ease;
+            width: 100%;
         }
-        .container.signup-active .login-panel { transform: translateX(-120%); opacity: 0; pointer-events: none; }
-        .container.signup-active .signup-panel { transform: translateX(0); opacity: 1; pointer-events: auto; position: relative; top: 0; }
+        .login-panel {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        .signup-panel {
+            position: absolute;
+            top: 120px;
+            left: 36px;
+            right: 36px;
+            transform: translateX(120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .container.signup-active .login-panel {
+            transform: translateX(-120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .container.signup-active .signup-panel {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+            position: relative;
+            top: 0;
+        }
 
         .form-group { margin-bottom: 20px; position: relative; }
-        .login-panel .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text); }
-        .login-panel .form-group input {
-            width: 100%; padding: 14px 16px; border: 1.5px solid var(--border); border-radius: 10px;
-            font-size: 0.95rem; background: #fafbfc; transition: border var(--transition), box-shadow var(--transition), background var(--transition);
-            outline: none; color: var(--text);
-        }
-        .login-panel .form-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); background: #fff; }
 
-        .signup-panel .form-group { margin-bottom: 26px; }
+        /* Connexion : labels fixes */
+        .login-panel .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text);
+        }
+        .login-panel .form-group input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            background: #fafbfc;
+            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+            color: var(--text);
+        }
+        .login-panel .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            background: #fff;
+        }
+
+        /* Inscription : labels flottants améliorés */
+        .signup-panel .form-group {
+            margin-bottom: 26px;
+        }
         .signup-panel .form-group label {
-            position: absolute; left: 16px; top: 16px; font-size: 0.9rem; color: var(--text-light);
-            pointer-events: none; transition: all 0.2s ease; background: transparent; padding: 0 4px;
-            transform-origin: left top; z-index: 1;
+            position: absolute;
+            left: 16px;
+            top: 16px;
+            font-size: 0.9rem;
+            color: var(--text-light);
+            pointer-events: none;
+            transition: all 0.2s ease;
+            background: transparent;
+            padding: 0 4px;
+            transform-origin: left top;
+            z-index: 1;
         }
         .signup-panel .form-group input {
-            width: 100%; padding: 18px 16px 10px 16px; border: 1.5px solid var(--border); border-radius: 10px;
-            font-size: 0.95rem; background: #fafbfc; transition: border var(--transition), box-shadow var(--transition), background var(--transition);
-            outline: none; color: var(--text); position: relative; z-index: 0;
+            width: 100%;
+            padding: 18px 16px 10px 16px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            font-size: 0.95rem;
+            background: #fafbfc;
+            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            outline: none;
+            color: var(--text);
+            position: relative;
+            z-index: 0;
         }
-        .signup-panel .form-group input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); background: #fff; }
+        .signup-panel .form-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            background: #fff;
+        }
+        /* Déplacement du label quand l'input est focus ou rempli */
         .signup-panel .form-group input:focus + label,
         .signup-panel .form-group input:not(:placeholder-shown) + label {
-            top: -10px; left: 12px; font-size: 0.7rem; font-weight: 600; color: var(--primary);
-            background: #fff; padding: 0 6px; border-radius: 4px; z-index: 2;
+            top: -10px;
+            left: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: #fff;
+            padding: 0 6px;
+            border-radius: 4px;
+            z-index: 2;
         }
-        .signup-panel .form-group input::placeholder { color: transparent; }
+        .signup-panel .form-group input::placeholder {
+            color: transparent;
+        }
 
         .password-wrapper { position: relative; }
         .toggle-password {
-            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-            background: none; border: none; cursor: pointer; font-size: 1.2rem; color: var(--text-light);
-            padding: 4px; transition: color var(--transition); z-index: 2;
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: var(--text-light);
+            padding: 4px;
+            transition: color var(--transition);
+            z-index: 2;
         }
         .toggle-password:hover { color: var(--primary); }
 
-        .error-message, .success-message { font-size: 0.8rem; margin-top: 6px; display: none; line-height: 1.4; }
+        .error-message, .success-message {
+            font-size: 0.8rem;
+            margin-top: 6px;
+            display: none;
+            line-height: 1.4;
+        }
         .error-message { color: var(--danger); }
         .success-message { color: var(--success); font-weight: 500; }
         .visible { display: block; }
 
         .btn-primary {
-            width: 100%; padding: 14px; border-radius: 10px; border: none; font-weight: 600;
-            cursor: pointer; font-size: 1rem; background: var(--primary); color: white;
-            transition: background var(--transition), transform var(--transition); letter-spacing: 0.3px; margin-top: 12px;
+            width: 100%;
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+            background: var(--primary);
+            color: white;
+            transition: background var(--transition), transform var(--transition);
+            letter-spacing: 0.3px;
+            margin-top: 12px;
         }
         .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
         .btn-primary:active { transform: translateY(0); }
@@ -116,9 +216,15 @@
         .forgot-password a:hover { text-decoration: underline; }
 
         .spinner {
-            display: inline-block; width: 16px; height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%;
-            animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle;
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -378,6 +484,16 @@
                     signupBtnText.textContent = 'Créer un compte';
                 }
             });
+
+            forgotPasswordLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                alert('Fonctionnalité à venir.');
+            });
+
+            const existingToken = localStorage.getItem('auth_token');
+            if (existingToken) {
+                window.location.href = '/dashboard.html';
+            }
         })();
     </script>
 </body>

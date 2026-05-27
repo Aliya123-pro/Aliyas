@@ -1,4 +1,4 @@
-// script.js – Version finale avec adaptation à l'absence du select Turnstile
+// script.js – Version finale complète avec toutes les corrections
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -257,11 +257,15 @@ async function claimWithCookies(account) {
                 return { success: false, message: `Claim déjà fait, dispo dans ${waitTime.toFixed(1)} min`, siteTimer: waitTime };
             }
 
-            // Scroll jusqu'au bouton
+            // Scroll jusqu'au bouton et forcer sa visibilité
             console.log('📜 Défilement jusqu\'au bouton Claim...');
             await page.evaluate((sel) => {
                 const btn = document.querySelector(sel);
-                if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (btn) {
+                    btn.style.display = 'inline-block';
+                    btn.style.visibility = 'visible';
+                    btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }, claimBtnSelector);
             await delay(3000);
             const isVisible = await page.evaluate((sel) => {
@@ -277,19 +281,22 @@ async function claimWithCookies(account) {
             }
             await page.screenshot({ path: path.join(screenshotsDir, '03_avant_turnstile.png') });
 
-            // === GESTION DU TURNSTILE (avec ou sans select) ===
+            // Récupérer les coordonnées APRÈS avoir forcé la visibilité
             const claimCoords = await page.evaluate(() => {
                 const btn = document.querySelector('#process_claim_hourly_faucet');
                 if (!btn) return null;
                 const rect = btn.getBoundingClientRect();
-                return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+                if (rect.width === 0 || rect.height === 0) return null;
+                return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             });
-            if (!claimCoords) throw new Error('Coordonnées Claim introuvables');
+            if (!claimCoords || claimCoords.x === 0 || claimCoords.y === 0) {
+                throw new Error('❌ Impossible d\'obtenir les coordonnées du bouton Claim (bouton invisible ?)');
+            }
+            console.log(`📍 Bouton Claim visible à (${Math.round(claimCoords.x)}, ${Math.round(claimCoords.y)})`);
 
-            // Vérifier si le select de type captcha est présent
+            // Gestion du Turnstile (avec ou sans select)
             const selectExists = await page.$('select');
             if (selectExists) {
-                // Ancien comportement : sélectionner Cloudflare Turnstile
                 console.log('🔍 Select captcha présent, sélection de Turnstile...');
                 const availableOptions = await page.$$eval('select option', opts =>
                     opts.map(o => ({ text: o.textContent.trim(), value: o.value }))
@@ -302,18 +309,18 @@ async function claimWithCookies(account) {
                     await page.screenshot({ path: path.join(screenshotsDir, '04_turnstile_selectionne.png') });
                 } else {
                     console.log('⚠️ Option Turnstile non trouvée, on continue sans sélection');
+                    await page.screenshot({ path: path.join(screenshotsDir, '04_pas_de_select.png') });
                 }
             } else {
                 console.log('ℹ️ Aucun select captcha, Turnstile déjà intégré');
                 await page.screenshot({ path: path.join(screenshotsDir, '04_pas_de_select.png') });
             }
 
-            // Clic sur la zone Turnstile (70px au-dessus du bouton Claim)
+            // Clic Turnstile (70px au‑dessus)
             await humanClickAt(page, { x: claimCoords.x, y: claimCoords.y - 70 });
             console.log('⏳ Attente du token Turnstile...');
             await delay(3000);
 
-            // Attendre le token Turnstile (max 30s)
             const tokenStart = Date.now();
             let tokenFound = false;
             while (Date.now() - tokenStart < 30000) {

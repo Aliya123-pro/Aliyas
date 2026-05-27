@@ -61,5 +61,12 @@
     "timestamp": 1779907564459,
     "success": true,
     "bonus": 0
+  },
+  {
+    "email": "hasiniainahasina1@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1779908702008,
+    "success": false,
+    "bonus": 0
   }
 ]

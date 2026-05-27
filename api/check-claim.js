@@ -1,4 +1,4 @@
-// api/check-claim.js – FICHIERS INDIVIDUELS + PAUSE DE 5 MIN
+// api/check-claim.js – Version avec logs de diagnostic pour identifier le blocage
 export default async function handler(req, res) {
     const SECRET = process.env.CRON_SECRET;
     const headerSecret = req.headers['x-cron-secret'];
@@ -51,21 +51,26 @@ export default async function handler(req, res) {
                 );
                 const account = JSON.parse(content);
                 const now = Date.now();
-                const EXPIRATION_MS = 5 * 60 * 1000;   // ← 5 minutes exactement
+                const EXPIRATION_MS = 5 * 60 * 1000;   // 5 minutes
 
-                // Nettoyage des flags expirés (plus de 5 min)
+                // Nettoyage des flags expirés
                 if (account.pendingClaim === true && account.pendingClaimSince && (now - account.pendingClaimSince >= EXPIRATION_MS)) {
                     account.pendingClaim = false;
                     delete account.pendingClaimSince;
                 }
 
-                // Ignorer si le compte est en cours (flag actif depuis moins de 5 min)
+                // 🔍 LOG DE DIAGNOSTIC – À CONSERVER JUSQU'À RÉSOLUTION
+                const last = account.lastClaim || 0;
+                const intervalMs = (account.timer || 60) * 60 * 1000;
+                const timeSinceLastClaim = now - last;
+                const timerOk = timeSinceLastClaim >= intervalMs;
+                console.log(`📄 ${file.name}: enabled=${account.enabled} pendingClaim=${account.pendingClaim} pendingLogout=${account.pendingLogout} lastClaim=${last} timer=${account.timer}min timeSince=${(timeSinceLastClaim/60000).toFixed(1)}min timerOk=${timerOk}`);
+
+                // Vérifications d'éligibilité
                 if (account.enabled === false) continue;
                 if (account.pendingLogout === true) continue;
                 if (account.pendingClaim === true) continue;
-                const last = account.lastClaim || 0;
-                const intervalMs = (account.timer || 60) * 60 * 1000;
-                if ((now - last) < intervalMs) continue;
+                if (!timerOk) continue;
 
                 // Poser le flag et sauvegarder
                 account.pendingClaim = true;

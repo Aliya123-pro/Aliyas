@@ -1,4 +1,4 @@
-// script.js – Version finale avec délai de 3 secondes après le token Turnstile
+// script.js – Version finale avec adaptation à l'absence du select Turnstile
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -247,7 +247,7 @@ async function claimWithCookies(account) {
             if (!claimBtn) {
                 console.log('⏳ Bouton Claim absent, lecture du timer...');
                 let minutesLeft = await extractTimer(page);
-                if (minutesLeft !== null && minutesLeft < 60) minutesLeft = 60; // ← forcer 60 min minimum
+                if (minutesLeft !== null && minutesLeft < 60) minutesLeft = 60;
                 const waitTime = minutesLeft !== null ? minutesLeft : 62;
                 console.log(`⏱️ Timer restant : ${waitTime.toFixed(1)} minutes`);
                 account.timer = waitTime;
@@ -277,19 +277,7 @@ async function claimWithCookies(account) {
             }
             await page.screenshot({ path: path.join(screenshotsDir, '03_avant_turnstile.png') });
 
-            // Turnstile
-            const selectSelector = 'select';
-            await page.waitForSelector(selectSelector, { visible: true, timeout: 10000 });
-            const availableOptions = await page.$$eval(`${selectSelector} option`, opts =>
-                opts.map(o => ({ text: o.textContent.trim(), value: o.value }))
-            );
-            const targetOption = availableOptions.find(o => o.text === 'Cloudflare Turnstile');
-            if (!targetOption) throw new Error('Option Turnstile introuvable');
-            await page.select(selectSelector, targetOption.value);
-            console.log('✅ Turnstile sélectionné');
-            await delay(5000);
-            await page.screenshot({ path: path.join(screenshotsDir, '04_turnstile_selectionne.png') });
-
+            // === GESTION DU TURNSTILE (avec ou sans select) ===
             const claimCoords = await page.evaluate(() => {
                 const btn = document.querySelector('#process_claim_hourly_faucet');
                 if (!btn) return null;
@@ -298,10 +286,34 @@ async function claimWithCookies(account) {
             });
             if (!claimCoords) throw new Error('Coordonnées Claim introuvables');
 
+            // Vérifier si le select de type captcha est présent
+            const selectExists = await page.$('select');
+            if (selectExists) {
+                // Ancien comportement : sélectionner Cloudflare Turnstile
+                console.log('🔍 Select captcha présent, sélection de Turnstile...');
+                const availableOptions = await page.$$eval('select option', opts =>
+                    opts.map(o => ({ text: o.textContent.trim(), value: o.value }))
+                );
+                const targetOption = availableOptions.find(o => o.text === 'Cloudflare Turnstile');
+                if (targetOption) {
+                    await page.select('select', targetOption.value);
+                    console.log('✅ Turnstile sélectionné');
+                    await delay(5000);
+                    await page.screenshot({ path: path.join(screenshotsDir, '04_turnstile_selectionne.png') });
+                } else {
+                    console.log('⚠️ Option Turnstile non trouvée, on continue sans sélection');
+                }
+            } else {
+                console.log('ℹ️ Aucun select captcha, Turnstile déjà intégré');
+                await page.screenshot({ path: path.join(screenshotsDir, '04_pas_de_select.png') });
+            }
+
+            // Clic sur la zone Turnstile (70px au-dessus du bouton Claim)
             await humanClickAt(page, { x: claimCoords.x, y: claimCoords.y - 70 });
             console.log('⏳ Attente du token Turnstile...');
             await delay(3000);
 
+            // Attendre le token Turnstile (max 30s)
             const tokenStart = Date.now();
             let tokenFound = false;
             while (Date.now() - tokenStart < 30000) {
@@ -317,7 +329,9 @@ async function claimWithCookies(account) {
                 }
                 await delay(2000);
             }
-            if (!tokenFound) throw new Error('Token Turnstile non apparu');
+            if (!tokenFound) {
+                console.warn('⚠️ Token Turnstile non apparu, on tente le clic Claim quand même');
+            }
 
             await page.screenshot({ path: path.join(screenshotsDir, '05_token_detecte.png') });
 

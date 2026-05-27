@@ -1,4 +1,4 @@
-// script.js – Claim avec cookies, captures d'écran, flag géré par check-claim
+// script.js – Claim avec cookies, captures, gestion correcte des erreurs et timer
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -78,17 +78,26 @@ async function humanClickAt(page, coords) {
 
 async function extractTimer(page) {
     return await page.evaluate(() => {
+        // Cherche le timer principal
         const timerEl = document.querySelector('#next_claim_timer, .countdown, [id*="timer"], [class*="timer"]');
         if (timerEl) {
             const txt = timerEl.textContent.trim();
             const mmss = txt.match(/(\d+):(\d+)/);
             if (mmss) return parseInt(mmss[1]) + parseInt(mmss[2]) / 60;
         }
+        // Cherche dans les cellules de tableau
         const cells = document.querySelectorAll('td, th');
         for (const cell of cells) {
             const txt = cell.textContent.trim();
             const mmss = txt.match(/(\d+):(\d+)/);
             if (mmss && txt.length <= 8) return parseInt(mmss[1]) + parseInt(mmss[2]) / 60;
+        }
+        // Cherche dans les messages d'erreur (ex: "try again in 10 minutes!")
+        const errorMsg = document.querySelector('.alert-danger, .error, [class*="error"]');
+        if (errorMsg) {
+            const msg = errorMsg.textContent.trim();
+            const match = msg.match(/(\d+)\s*(minutes?|mins?)/i);
+            if (match) return parseInt(match[1]);
         }
         return null;
     });
@@ -138,16 +147,9 @@ async function saveAccount(account) {
     }
 }
 
-// 📜 Ajout d'une entrée dans l'historique
 async function addHistoryEntry(userId, email, platform, success, bonus = 0) {
     const historyFile = `history_${userId}.json`;
-    const entry = {
-        email,
-        platform,
-        timestamp: Date.now(),
-        success,
-        bonus
-    };
+    const entry = { email, platform, timestamp: Date.now(), success, bonus };
     try {
         let history = [];
         let sha = null;
@@ -202,10 +204,9 @@ async function claimWithCookies(account) {
             await delay(10000);
             await page.setViewport({ width: 1280, height: 720 });
 
-            // Capture d'écran initiale
-            await page.screenshot({ path: path.join(screenshotsDir, `01_navigateur_ouvert.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '01_navigateur_ouvert.png') });
 
-            // Injection des cookies (toujours)
+            // Injection des cookies
             let cookiesInjected = false;
             if (account.cookies) {
                 try {
@@ -227,12 +228,11 @@ async function claimWithCookies(account) {
             console.log(`🌐 Accès à ${faucetUrl}`);
             await page.goto(faucetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
             await delay(5000);
-            await page.screenshot({ path: path.join(screenshotsDir, `02_page_faucet.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '02_page_faucet.png') });
 
             if (page.url().includes('login.php')) {
-                console.error('❌ Cookies expirés – reconnexion automatique désactivée.');
+                console.error('❌ Cookies expirés');
                 account.cookiesStatus = 'expired';
-                // On ne touche pas à pendingClaim, c'est check-claim qui le gère
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: 'Cookies expirés' };
@@ -241,34 +241,45 @@ async function claimWithCookies(account) {
             console.log('✅ Session valide');
             account.cookiesStatus = 'valid';
 
-            // Vérifier le bouton Claim
+            // Scroll jusqu'au bouton Claim
+            console.log('📜 Défilement jusqu\'au bouton Claim...');
+            await page.waitForSelector('#process_claim_hourly_faucet', { visible: true, timeout: 15000 });
+            await page.evaluate(() => {
+                const btn = document.querySelector('#process_claim_hourly_faucet');
+                if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+            await delay(3000);
+            const isVisible = await page.evaluate(() => {
+                const el = document.querySelector('#process_claim_hourly_faucet');
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.top >= 0 && rect.bottom <= window.innerHeight;
+            });
+            if (!isVisible) {
+                console.log('⚠️ Bouton pas entièrement visible, défilement supplémentaire...');
+                await page.evaluate(() => window.scrollBy(0, 300));
+                await delay(1000);
+            }
+            await page.screenshot({ path: path.join(screenshotsDir, '03_avant_turnstile.png') });
+
+            // Vérifier bouton Claim présent
             const claimBtnPresent = await page.evaluate(() => {
                 const btn = document.querySelector('#process_claim_hourly_faucet');
                 return btn !== null && btn.offsetParent !== null;
             });
-
             if (!claimBtnPresent) {
                 console.log('⏳ Bouton Claim absent, lecture du timer...');
                 let minutesLeft = null;
                 try { minutesLeft = await extractTimer(page); } catch (e) {}
                 const waitTime = minutesLeft || 62;
                 console.log(`⏱️ Timer restant : ${waitTime.toFixed(1)} minutes`);
-
                 account.timer = waitTime;
                 account.lastClaim = Date.now();
-                // On ne touche pas à pendingClaim, c'est check-claim qui le gère
                 await saveAccount(account);
                 return { success: false, message: `Claim déjà fait, dispo dans ${waitTime.toFixed(1)} min`, siteTimer: waitTime };
             }
 
-            // Scroll et Turnstile
-            await page.evaluate(() => {
-                const btn = document.querySelector('#process_claim_hourly_faucet');
-                if (btn) btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            });
-            await delay(3000);
-            await page.screenshot({ path: path.join(screenshotsDir, `03_avant_turnstile.png`) });
-
+            // Turnstile
             const selectSelector = 'select';
             await page.waitForSelector(selectSelector, { visible: true, timeout: 10000 });
             const availableOptions = await page.$$eval(`${selectSelector} option`, opts =>
@@ -279,7 +290,7 @@ async function claimWithCookies(account) {
             await page.select(selectSelector, targetOption.value);
             console.log('✅ Turnstile sélectionné');
             await delay(5000);
-            await page.screenshot({ path: path.join(screenshotsDir, `04_turnstile_selectionne.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '04_turnstile_selectionne.png') });
 
             const claimCoords = await page.evaluate(() => {
                 const btn = document.querySelector('#process_claim_hourly_faucet');
@@ -310,21 +321,21 @@ async function claimWithCookies(account) {
             }
             if (!tokenFound) throw new Error('Token Turnstile non apparu');
 
-            await page.screenshot({ path: path.join(screenshotsDir, `05_token_detecte.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '05_token_detecte.png') });
 
             // Clic Claim
             await humanClickAt(page, claimCoords);
             console.log('🖱️ Clic sur le bouton Claim effectué');
-            await page.screenshot({ path: path.join(screenshotsDir, `06_apres_clic_claim.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '06_apres_clic_claim.png') });
 
-            // Détection améliorée du succès + capture du message
+            // Détection du résultat (succès ou erreur)
             const claimResult = await Promise.race([
                 page.waitForFunction(() => {
                     const btn = document.querySelector('#process_claim_hourly_faucet');
                     return btn && btn.disabled;
                 }, { timeout: 20000 }),
                 page.waitForFunction(() => {
-                    const messages = document.querySelectorAll('.alert-success, .success, [class*="success"], .alert-danger, .error, [class*="error"]');
+                    const messages = document.querySelectorAll('.alert-success, .alert-danger, .error, [class*="error"], .success, [class*="success"]');
                     for (const msg of messages) {
                         if (msg.textContent.trim().length > 0) return true;
                     }
@@ -334,42 +345,43 @@ async function claimWithCookies(account) {
 
             await page.waitForNetworkIdle({ timeout: 10000 }).catch(() => {});
             await delay(3000);
-            await page.screenshot({ path: path.join(screenshotsDir, `07_resultat.png`) });
+            await page.screenshot({ path: path.join(screenshotsDir, '07_resultat.png') });
 
-            let success = false;
-            let resultMessage = '';
-
+            // Lire les messages visibles
             const messages = await page.evaluate(() => {
                 return Array.from(document.querySelectorAll('.alert-success, .alert-danger, .success, [class*="success"], .error, [class*="error"]'))
                     .map(el => el.textContent.trim()).filter(t => t);
             });
-            resultMessage = messages[0] || '';
-
-            if (claimResult !== 'timeout') {
-                success = true;
-                console.log('✅ Succès détecté (bouton désactivé ou message)');
-            } else {
-                const btnDisabledNow = await page.evaluate(() => {
-                    const btn = document.querySelector('#process_claim_hourly_faucet');
-                    return btn ? btn.disabled : false;
-                });
-                success = btnDisabledNow;
-                if (success) console.log('✅ Succès détecté après délai');
-                else console.log('⚠️ Statut incertain après délai');
-            }
-
+            const resultMessage = messages[0] || '';
             if (resultMessage) console.log(`📢 Message du site : ${resultMessage}`);
 
-            // Lire le timer après l'action
+            // Déterminer le succès
+            let success = false;
+            const isError = /error|something went wrong|try again/i.test(resultMessage);
+            const btnDisabledNow = await page.evaluate(() => {
+                const btn = document.querySelector('#process_claim_hourly_faucet');
+                return btn ? btn.disabled : false;
+            });
+
+            if (!isError && (claimResult !== 'timeout' || btnDisabledNow)) {
+                success = true;
+                console.log('✅ Claim réussi');
+            } else if (isError) {
+                console.log('❌ Erreur détectée, claim échoué');
+            } else {
+                console.log('⚠️ Statut incertain');
+            }
+
+            // Toujours lire le timer après l'action
             const newTimer = await extractTimer(page);
             if (newTimer !== null) account.timer = newTimer;
             account.lastClaim = Date.now();
-            // on ne touche pas à pendingClaim
+            // Ne pas toucher à pendingClaim (géré par check-claim.js)
 
             await saveAccount(account);
             await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, 0);
 
-            return { success, message: success ? (resultMessage || 'Claim OK') : (resultMessage || 'Statut incertain') };
+            return { success, message: resultMessage || (success ? 'Claim OK' : 'Échec') };
 
         } catch (err) {
             console.error(`❌ Erreur tentative ${attempt}: ${err.message}`);

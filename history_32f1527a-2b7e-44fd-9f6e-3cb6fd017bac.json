@@ -6,5 +6,13 @@
     "success": false,
     "message": "Cookies expirés – reconnexion automatique désactivée.",
     "bonus": 0
+  },
+  {
+    "email": "rajole245@gmail.com",
+    "platform": "suipick",
+    "timestamp": 1779895287439,
+    "success": false,
+    "message": "Cookies expirés – reconnexion automatique désactivée.",
+    "bonus": 0
   }
 ]

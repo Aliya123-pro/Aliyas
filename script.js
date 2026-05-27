@@ -1,4 +1,4 @@
-// script.js – Claim avec cookies, captures, attente 20s, mise à jour fiable de lastClaim
+// script.js – Version finale avec délai de 3 secondes après le token Turnstile
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -78,21 +78,18 @@ async function humanClickAt(page, coords) {
 
 async function extractTimer(page) {
     return await page.evaluate(() => {
-        // Cherche le timer principal
         const timerEl = document.querySelector('#next_claim_timer, .countdown, [id*="timer"], [class*="timer"]');
         if (timerEl) {
             const txt = timerEl.textContent.trim();
             const mmss = txt.match(/(\d+):(\d+)/);
             if (mmss) return parseInt(mmss[1]) + parseInt(mmss[2]) / 60;
         }
-        // Cherche dans les cellules de tableau
         const cells = document.querySelectorAll('td, th');
         for (const cell of cells) {
             const txt = cell.textContent.trim();
             const mmss = txt.match(/(\d+):(\d+)/);
             if (mmss && txt.length <= 8) return parseInt(mmss[1]) + parseInt(mmss[2]) / 60;
         }
-        // Cherche dans les messages d'erreur (ex: "try again in 10 minutes!")
         const errorMsg = document.querySelector('.alert-danger, .error, [class*="error"]');
         if (errorMsg) {
             const msg = errorMsg.textContent.trim();
@@ -230,14 +227,17 @@ async function claimWithCookies(account) {
             await delay(20000);
             await page.screenshot({ path: path.join(screenshotsDir, '02_page_faucet.png') });
 
+            // Cookies expirés
             if (page.url().includes('login.php')) {
                 console.error('❌ Cookies expirés');
                 account.cookiesStatus = 'expired';
-                account.lastClaim = Date.now();                // ⭐ Mise à jour
+                account.timer = 120;
+                account.lastClaim = Date.now();
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: 'Cookies expirés' };
             }
+
             console.log('✅ Session valide');
             account.cookiesStatus = 'valid';
 
@@ -247,16 +247,17 @@ async function claimWithCookies(account) {
             if (!claimBtn) {
                 console.log('⏳ Bouton Claim absent, lecture du timer...');
                 let minutesLeft = await extractTimer(page);
-                const waitTime = minutesLeft || 62;
+                if (minutesLeft !== null && minutesLeft < 60) minutesLeft = 60; // ← forcer 60 min minimum
+                const waitTime = minutesLeft !== null ? minutesLeft : 62;
                 console.log(`⏱️ Timer restant : ${waitTime.toFixed(1)} minutes`);
                 account.timer = waitTime;
-                account.lastClaim = Date.now();                // ⭐ Mise à jour
+                account.lastClaim = Date.now();
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: `Claim déjà fait, dispo dans ${waitTime.toFixed(1)} min`, siteTimer: waitTime };
             }
 
-            // Scroll progressif jusqu'au bouton
+            // Scroll jusqu'au bouton
             console.log('📜 Défilement jusqu\'au bouton Claim...');
             await page.evaluate((sel) => {
                 const btn = document.querySelector(sel);
@@ -320,6 +321,10 @@ async function claimWithCookies(account) {
 
             await page.screenshot({ path: path.join(screenshotsDir, '05_token_detecte.png') });
 
+            // ⏳ Attendre 3 secondes avant de cliquer sur le bouton Claim
+            console.log('⏳ Attente 3s avant clic Claim...');
+            await delay(3000);
+
             // Clic Claim
             await humanClickAt(page, claimCoords);
             console.log('🖱️ Clic sur le bouton Claim effectué');
@@ -367,9 +372,16 @@ async function claimWithCookies(account) {
                 console.log('⚠️ Statut incertain');
             }
 
-            const newTimer = await extractTimer(page);
-            if (newTimer !== null) account.timer = newTimer;
-            account.lastClaim = Date.now();                    // ⭐ Mise à jour finale
+            // Règle de timer FORCÉE
+            if (success || (!isError && !success)) {
+                let newTimer = await extractTimer(page);
+                if (newTimer !== null && newTimer < 60) newTimer = 60;
+                account.timer = newTimer !== null ? newTimer : 62;
+            } else {
+                account.timer = 120;
+            }
+            account.lastClaim = Date.now();
+
             await saveAccount(account);
             await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, 0);
             return { success, message: resultMessage || (success ? 'Claim OK' : 'Échec') };

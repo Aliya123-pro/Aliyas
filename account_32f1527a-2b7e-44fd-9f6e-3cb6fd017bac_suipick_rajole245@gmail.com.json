@@ -9,6 +9,6 @@
   "lastClaim": 1779891432799,
   "timer": 62,
   "pendingClaim": true,
-  "pendingClaimSince": 1779891368641,
-  "nextClaimTime": 1779895152799
+  "nextClaimTime": 1779895152799,
+  "pendingClaimSince": 1779895217854
 }

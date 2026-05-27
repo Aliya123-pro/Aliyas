@@ -1,4 +1,4 @@
-// script.js – Claim avec cookies (version sans blocage injustifié)
+// script.js – Claim avec cookies (version robuste avec délai anti-ECONNREFUSED)
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -166,9 +166,12 @@ async function claimWithCookies(account) {
             }
             const { browser: br, page } = await connect(options);
             browser = br;
+            // ⭐ Délai de 10 secondes pour que le navigateur soit complètement prêt
+            console.log('⏳ Attente 10s pour stabilisation du navigateur...');
+            await delay(10000);
             await page.setViewport({ width: 1280, height: 720 });
 
-            // ⭐ Injection des cookies (toujours, même si le statut est "expired")
+            // Injection des cookies (toujours, même si le statut est "expired")
             let cookiesInjected = false;
             if (account.cookies) {
                 try {
@@ -187,14 +190,13 @@ async function claimWithCookies(account) {
                 }
             }
             if (!cookiesInjected) {
-                console.warn('⚠️ Aucun cookie injecté, la session risque d\'être perdue');
+                console.warn('⚠️ Aucun cookie injecté');
             }
 
             console.log(`🌐 Accès à ${faucetUrl}`);
             await page.goto(faucetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
             await delay(5000);
 
-            // Vérification réelle de l'expiration des cookies
             if (page.url().includes('login.php')) {
                 console.error('❌ Cookies expirés – reconnexion automatique désactivée.');
                 account.cookiesStatus = 'expired';
@@ -203,9 +205,9 @@ async function claimWithCookies(account) {
             }
 
             console.log('✅ Session valide, statut remis à valid');
-            account.cookiesStatus = 'valid';   // ⭐ on répare le statut si besoin
+            account.cookiesStatus = 'valid';
 
-            // --- Suite du claim (identique à l'original) ---
+            // --- Suite du claim ---
             const claimBtnPresent = await page.evaluate(() => {
                 const btn = document.querySelector('#process_claim_hourly_faucet');
                 return btn !== null && btn.offsetParent !== null;
@@ -248,12 +250,10 @@ async function claimWithCookies(account) {
             });
             if (!claimCoords) throw new Error('Bouton Claim introuvable');
 
-            // Clic Turnstile
             await humanClickAt(page, { x: claimCoords.x, y: claimCoords.y - 70 });
             console.log('⏳ Attente du token Turnstile...');
             await delay(3000);
 
-            // Attendre le token
             const tokenStart = Date.now();
             let tokenFound = false;
             while (Date.now() - tokenStart < 30000) {
@@ -271,25 +271,48 @@ async function claimWithCookies(account) {
             }
             if (!tokenFound) throw new Error('Token Turnstile non apparu');
 
-            // Clic Claim
+            // Clic Claim + détection améliorée du succès
             await humanClickAt(page, claimCoords);
-            await page.waitForNetworkIdle({ timeout: 20000 }).catch(() => {});
-            await delay(5000);
+            console.log('🖱️ Clic sur le bouton Claim effectué');
 
-            const btnDisabled = await page.evaluate(() => {
-                const btn = document.querySelector('#process_claim_hourly_faucet');
-                return btn ? btn.disabled : false;
-            });
-            console.log(btnDisabled ? '✅ Claim réussi' : '⚠️ Statut incertain');
+            const claimResult = await Promise.race([
+                page.waitForFunction(() => {
+                    const btn = document.querySelector('#process_claim_hourly_faucet');
+                    return btn && btn.disabled;
+                }, { timeout: 20000 }),
+                page.waitForFunction(() => {
+                    const messages = document.querySelectorAll('.alert-success, .success, [class*="success"]');
+                    for (const msg of messages) {
+                        if (msg.textContent.trim().length > 0) return true;
+                    }
+                    return false;
+                }, { timeout: 20000 })
+            ]).catch(() => 'timeout');
 
-            // Mise à jour
+            await page.waitForNetworkIdle({ timeout: 10000 }).catch(() => {});
+            await delay(3000);
+
+            let success = false;
+            if (claimResult !== 'timeout') {
+                success = true;
+                console.log('✅ Succès détecté (bouton désactivé ou message)');
+            } else {
+                const btnDisabledNow = await page.evaluate(() => {
+                    const btn = document.querySelector('#process_claim_hourly_faucet');
+                    return btn ? btn.disabled : false;
+                });
+                success = btnDisabledNow;
+                if (success) console.log('✅ Succès détecté après délai');
+                else console.log('⚠️ Statut incertain après délai');
+            }
+
             account.lastClaim = Date.now();
-            if (!btnDisabled) {
+            if (!success) {
                 const timerVal = await extractTimer(page);
                 if (timerVal) account.timer = timerVal;
             }
             await saveAccount(account);
-            return { success: btnDisabled, message: btnDisabled ? 'Claim OK' : 'Statut incertain' };
+            return { success, message: success ? 'Claim OK' : 'Statut incertain' };
 
         } catch (err) {
             console.error(`❌ Erreur tentative ${attempt}: ${err.message}`);
@@ -311,7 +334,6 @@ async function claimWithCookies(account) {
         }
         console.log(`📋 Compte chargé : ${account.email} (${account.platform})`);
 
-        // ⭐ Lancement du claim (sans vérification préalable du cookiesStatus)
         const result = await claimWithCookies(account);
 
         console.log(`🏁 Terminé. Succès: ${result.success} - ${result.message}`);

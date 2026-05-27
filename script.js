@@ -1,4 +1,4 @@
-// script.js – Claim avec cookies, captures, attente 20s, gestion absence bouton
+// script.js – Claim avec cookies, captures, attente 20s, mise à jour fiable de lastClaim
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
@@ -226,7 +226,6 @@ async function claimWithCookies(account) {
 
             console.log(`🌐 Accès à ${faucetUrl}`);
             await page.goto(faucetUrl, { waitUntil: 'networkidle2', timeout: 90000 });
-            // ⭐ Attendre 20 secondes supplémentaires pour que la page soit complètement chargée
             console.log('⏳ Pause de 20s pour chargement complet de la page...');
             await delay(20000);
             await page.screenshot({ path: path.join(screenshotsDir, '02_page_faucet.png') });
@@ -234,6 +233,7 @@ async function claimWithCookies(account) {
             if (page.url().includes('login.php')) {
                 console.error('❌ Cookies expirés');
                 account.cookiesStatus = 'expired';
+                account.lastClaim = Date.now();                // ⭐ Mise à jour
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: 'Cookies expirés' };
@@ -241,17 +241,16 @@ async function claimWithCookies(account) {
             console.log('✅ Session valide');
             account.cookiesStatus = 'valid';
 
-            // Vérifier la présence du bouton Claim (sans planter s'il est absent)
+            // Vérifier la présence du bouton Claim
             const claimBtnSelector = '#process_claim_hourly_faucet';
             let claimBtn = await page.$(claimBtnSelector);
             if (!claimBtn) {
-                // Le bouton n'existe même pas dans le DOM, c'est probablement un timer
                 console.log('⏳ Bouton Claim absent, lecture du timer...');
                 let minutesLeft = await extractTimer(page);
                 const waitTime = minutesLeft || 62;
                 console.log(`⏱️ Timer restant : ${waitTime.toFixed(1)} minutes`);
                 account.timer = waitTime;
-                account.lastClaim = Date.now();
+                account.lastClaim = Date.now();                // ⭐ Mise à jour
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: `Claim déjà fait, dispo dans ${waitTime.toFixed(1)} min`, siteTimer: waitTime };
@@ -276,18 +275,6 @@ async function claimWithCookies(account) {
                 await delay(1000);
             }
             await page.screenshot({ path: path.join(screenshotsDir, '03_avant_turnstile.png') });
-
-            // Vérifier à nouveau qu'il est bien visible et cliquable
-            claimBtn = await page.$(claimBtnSelector);
-            if (!claimBtn) {
-                // A disparu entre-temps (peu probable mais on gère)
-                let minutesLeft = await extractTimer(page);
-                const waitTime = minutesLeft || 62;
-                account.timer = waitTime;
-                account.lastClaim = Date.now();
-                await saveAccount(account);
-                return { success: false, message: `Timer inattendu`, siteTimer: waitTime };
-            }
 
             // Turnstile
             const selectSelector = 'select';
@@ -382,7 +369,7 @@ async function claimWithCookies(account) {
 
             const newTimer = await extractTimer(page);
             if (newTimer !== null) account.timer = newTimer;
-            account.lastClaim = Date.now();
+            account.lastClaim = Date.now();                    // ⭐ Mise à jour finale
             await saveAccount(account);
             await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, 0);
             return { success, message: resultMessage || (success ? 'Claim OK' : 'Échec') };

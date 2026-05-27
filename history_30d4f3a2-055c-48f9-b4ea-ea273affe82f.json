@@ -6,5 +6,13 @@
     "success": true,
     "message": "×Success!You got 0.001000 TRX!",
     "bonus": 0.001
+  },
+  {
+    "email": "finoanarivoniaina@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1779889594317,
+    "success": true,
+    "message": "×Success!You got 0.00060000 LTC!",
+    "bonus": 0.0006
   }
 ]

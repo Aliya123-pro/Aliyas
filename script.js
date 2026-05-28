@@ -174,6 +174,7 @@ async function claimWithCookies(account) {
     const faucetUrls = {
         tronpick: 'https://tronpick.io/faucet.php',
         litepick: 'https://litepick.io/faucet.php',
+        polpick: 'https://polpick.io/faucet.php',
         dogepick: 'https://dogepick.io/faucet.php',
         solpick: 'https://solpick.io/faucet.php',
         bnbpick: 'https://bnbpick.io/faucet.php',

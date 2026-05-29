@@ -201,5 +201,12 @@
     "timestamp": 1780066383214,
     "success": true,
     "bonus": 0
+  },
+  {
+    "email": "irygracia@gmail.com",
+    "platform": "bnbpick",
+    "timestamp": 1780068447129,
+    "success": false,
+    "bonus": 0
   }
 ]

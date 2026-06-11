@@ -460,5 +460,12 @@
     "timestamp": 1781182049270,
     "success": true,
     "bonus": 0
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "dogepick",
+    "timestamp": 1781183350470,
+    "success": false,
+    "bonus": 0
   }
 ]

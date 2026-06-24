@@ -138,8 +138,7 @@
                 <div class="form-group"><label>Plateforme</label><select id="platform">
                     <option value="tronpick">TronPick</option><option value="litepick">LitePick</option>
                     <option value="dogepick">DogePick</option><option value="solpick">SolPick</option><option value="bnbpick">BnBPick</option>
-               <option value="tonpick">TonPick</option><option value="suipick">SuiPick</option><option value="polpick">PolPick</option>
-                
+                    <option value="tonpick">TonPick</option><option value="suipick">SuiPick</option><option value="polpick">PolPick</option><option value="1xbet">1xbet</option>
                 </select></div>
                 <div class="form-group"><label>Timer initial (mm:ss)</label><input type="text" id="initialTimer" placeholder="60:00" pattern="[0-9]{1,2}:[0-5][0-9]"></div>
                 <div class="modal-actions">
@@ -153,11 +152,13 @@
     <!-- Modale Historique -->
     <div class="history-modal" id="historyModal">
         <div class="history-content">
-            <h3>📊 Historique 24h</h3>
-            <p id="historyEmail"></p>
-            <p id="historySuccess">Chargement...</p>
-            <p id="historyBonus"></p>
-            <button class="btn btn-primary" onclick="document.getElementById('historyModal').classList.remove('active')">Fermer</button>
+            <h3>📊 Résumé du compte</h3>
+            <p id="historyCreatedAt"></p>
+            <p id="historyInitialBalance"></p>
+            <p id="historyTotalClaims"></p>
+            <p id="historyFinalBalance"></p>
+            <button class="btn btn-primary" id="btnCloseHistory">Fermer</button>
+            <button class="btn btn-primary" id="btnPause">⏸️ Pause</button>
         </div>
     </div>
 
@@ -195,10 +196,21 @@
             const toast = document.getElementById('toast');
             const accountsContainer = document.getElementById('accountsContainer');
             const welcomeMessage = document.getElementById('welcomeMessage');
+            const btnCloseHistory = document.getElementById('btnCloseHistory');
+            const btnPause = document.getElementById('btnPause');
 
             let currentUserId = null;
             let currentAccounts = [];
             let countdownIntervals = [];
+            let currentHistoryAccount = null;
+
+            // Lier le bouton Fermer
+            btnCloseHistory.addEventListener('click', () => {
+                document.getElementById('historyModal').classList.remove('active');
+            });
+
+            // Lier le bouton Pause (plus de onclick dans le HTML)
+            btnPause.addEventListener('click', togglePause);
 
             function showToast(msg, type = '') {
                 toast.textContent = msg;
@@ -218,40 +230,6 @@
                 if (!str || !str.includes(':')) return 60;
                 const [mins, secs] = str.split(':').map(Number);
                 return (mins || 0) + (secs || 0) / 60;
-            }
-
-            function showLoader(accountElement) {
-                const info = accountElement.querySelector('.account-info');
-                if (info && !info.querySelector('.spinner')) {
-                    const spinner = document.createElement('span');
-                    spinner.className = 'spinner';
-                    info.prepend(spinner);
-                }
-            }
-
-            function hideLoader(accountElement) {
-                const spinner = accountElement.querySelector('.spinner');
-                if (spinner) spinner.remove();
-            }
-
-            async function getUserId() {
-                const token = localStorage.getItem('auth_token');
-                if (!token) {
-                    window.location.href = '/index.html';
-                    return null;
-                }
-                try {
-                    const { data: { user }, error } = await supabase.auth.getUser(token);
-                    if (error) throw error;
-                    const username = user.user_metadata?.username || user.email;
-                    welcomeMessage.textContent = `Bienvenue, ${username}`;
-                    return user.id;
-                } catch (e) {
-                    showToast('Session expirée. Redirection...', 'error');
-                    localStorage.removeItem('auth_token');
-                    setTimeout(() => { window.location.href = '/index.html'; }, 1500);
-                    return null;
-                }
             }
 
             const LOGIN_WORKFLOW_ID = 'test-account.yml';
@@ -291,6 +269,85 @@
                 } catch (e) {
                     if (e.message && e.message.includes('404')) return [];
                     throw e;
+                }
+            }
+
+            async function refreshAccounts() {
+                try {
+                    currentAccounts = await loadAccounts();
+                    renderAccounts();
+                } catch (e) {
+                    showToast(`Erreur chargement: ${e.message}`, 'error');
+                }
+            }
+
+           async function togglePause() {
+    if (!currentHistoryAccount) return;
+    const newEnabled = !currentHistoryAccount.enabled;
+    const accountFile = `account_${currentUserId}_${currentHistoryAccount.platform}_${currentHistoryAccount.email}.json`;
+    try {
+        // 1. Obtenir le fichier actuel (pour avoir le sha)
+        const fileData = await githubApi('GET', `/repos/${GH_USERNAME}/${GH_REPO}/contents/${accountFile}`);
+        const sha = fileData.sha;
+
+        // 2. Lire le contenu actuel (il est en base64)
+        const currentContent = JSON.parse(atob(fileData.content));
+        // Mettre à jour le champ enabled
+        currentContent.enabled = newEnabled;
+
+        // 3. Encoder le nouveau contenu en base64
+        const newContentBase64 = btoa(unescape(encodeURIComponent(JSON.stringify(currentContent, null, 2))));
+
+        // 4. Envoyer la mise à jour avec le bon payload
+        await githubApi('PUT', `/repos/${GH_USERNAME}/${GH_REPO}/contents/${accountFile}`, {
+            content: newContentBase64,
+            sha: sha,
+            message: newEnabled ? 'Reprise du compte' : 'Pause du compte',
+            branch: BRANCH
+        });
+
+        // 5. Mettre à jour l’interface
+        currentHistoryAccount.enabled = newEnabled;
+        document.getElementById('btnPause').textContent = newEnabled ? '⏸️ Pause' : '▶️ Reprendre';
+        showToast(`Compte ${newEnabled ? 'réactivé' : 'mis en pause'}`, 'success');
+        await refreshAccounts();
+    } catch (err) {
+        showToast('Erreur lors de la mise à jour', 'error');
+        console.error(err);
+    }
+} 
+
+            function showLoader(accountElement) {
+                const info = accountElement.querySelector('.account-info');
+                if (info && !info.querySelector('.spinner')) {
+                    const spinner = document.createElement('span');
+                    spinner.className = 'spinner';
+                    info.prepend(spinner);
+                }
+            }
+
+            function hideLoader(accountElement) {
+                const spinner = accountElement.querySelector('.spinner');
+                if (spinner) spinner.remove();
+            }
+
+            async function getUserId() {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    window.location.href = '/index.html';
+                    return null;
+                }
+                try {
+                    const { data: { user }, error } = await supabase.auth.getUser(token);
+                    if (error) throw error;
+                    const username = user.user_metadata?.username || user.email;
+                    welcomeMessage.textContent = `Bienvenue, ${username}`;
+                    return user.id;
+                } catch (e) {
+                    showToast('Session expirée. Redirection...', 'error');
+                    localStorage.removeItem('auth_token');
+                    setTimeout(() => { window.location.href = '/index.html'; }, 1500);
+                    return null;
                 }
             }
 
@@ -344,7 +401,10 @@
                         return `${mins}:${secs.toString().padStart(2, '0')}`;
                     };
 
+                    const isPaused = acc.enabled === false;
                     const isFailed = acc.cookiesStatus === 'failed';
+                    const displayTime = isPaused ? '⏸️ Pause' : (isFailed ? 'Échec' : formatTime(remainingMs));
+
                     const item = document.createElement('div');
                     item.className = 'account-item';
                     item.dataset.index = idx;
@@ -352,14 +412,15 @@
                         <div class="account-info">
                             <span class="account-email">${acc.email}</span>
                             <span class="account-site">${acc.platform || 'tronpick'}</span>
-                            <span class="account-countdown" id="cd-${idx}">${isFailed ? 'Échec' : formatTime(remainingMs)}</span>
+                            <span class="account-countdown" id="cd-${idx}">${displayTime}</span>
                             ${isFailed ? '<span class="badge badge-failed">Échec</span>' : ''}
                         </div>
                         <button class="btn btn-outline btn-delete" title="Supprimer le compte">🗑️</button>
                     `;
                     accountsContainer.appendChild(item);
 
-                    if (!isFailed) {
+                    // Lancer le compte à rebours uniquement si le compte est actif et non en échec
+                    if (!isPaused && !isFailed) {
                         const interval = setInterval(() => {
                             const n = Date.now();
                             const r = Math.max(0, nextClaimTime - n);
@@ -414,7 +475,7 @@
                                     isDeleted = true;
                                     break;
                                 }
-                            }
+                            } 
 
                             clearInterval(countdownInterval);
                             if (isDeleted) {
@@ -438,48 +499,45 @@
                 attachHistoryClicks();
             }
 
-            async function refreshAccounts() {
-                try {
-                    currentAccounts = await loadAccounts();
-                    renderAccounts();
-                } catch (e) {
-                    showToast(`Erreur chargement: ${e.message}`, 'error');
-                }
-            }
-
             function attachHistoryClicks() {
                 document.querySelectorAll('.account-email').forEach(span => {
                     span.style.cursor = 'pointer';
-                    span.addEventListener('click', (e) => {
-                        const item = span.closest('.account-item');
-                        const idx = parseInt(item.dataset.index);
-                        const visibleAccounts = currentAccounts.filter(acc => acc.cookiesStatus !== 'failed');
-                        const acc = visibleAccounts[idx];
-                        if (acc) showHistory(acc);
-                    });
+                    span.removeEventListener('click', historyClickHandler);
+                    span.addEventListener('click', historyClickHandler);
                 });
             }
 
-            async function showHistory(account) {
-                const histModal = document.getElementById('historyModal');
-                document.getElementById('historyEmail').textContent = `${account.email} (${account.platform})`;
-                document.getElementById('historySuccess').textContent = 'Chargement...';
-                document.getElementById('historyBonus').textContent = '';
-                histModal.classList.add('active');
+            function historyClickHandler(e) {
+                const span = e.currentTarget;
+                const item = span.closest('.account-item');
+                if (!item) return;
+                const idx = parseInt(item.dataset.index);
+                const visibleAccounts = currentAccounts.filter(acc => acc.cookiesStatus !== 'failed');
+                const acc = visibleAccounts[idx];
+                if (acc) showHistory(acc);
+            }
 
-                try {
-                    const periodStart = account.periodStart || 0;
-                    const res = await fetch(`/api/history?userId=${currentUserId}&periodStart=${periodStart}`);
-                    const data = await res.json();
-                    const accountEntries = data.entries.filter(e => e.email === account.email && e.platform === account.platform);
-                    const successCount = accountEntries.filter(e => e.success).length;
-                    const totalBonus = accountEntries.reduce((sum, e) => sum + (e.bonus || 0), 0);
-                    document.getElementById('historySuccess').textContent = `✅ Claims réussis (24h) : ${successCount}`;
-                    document.getElementById('historyBonus').textContent = `💰 Total bonus : ${totalBonus}`;
-                } catch (err) {
-                    document.getElementById('historySuccess').textContent = '❌ Erreur';
-                    document.getElementById('historyBonus').textContent = '';
-                }
+            function showHistory(account) {
+                const histModal = document.getElementById('historyModal');
+                const createdAt = account.createdAt 
+                    ? new Date(account.createdAt).toLocaleString() 
+                    : 'Non enregistré';
+                const initialBalance = account.initialBalance ?? 0;
+                const totalClaims = account.totalClaims ?? 0;
+                const finalBalance = account.finalBalance ?? 0;
+
+                document.getElementById('historyCreatedAt').textContent = 
+                    `🕒 Début : ${createdAt}`;
+                document.getElementById('historyInitialBalance').textContent = 
+                    `💰 Solde initial : ${initialBalance}`;
+                document.getElementById('historyTotalClaims').textContent = 
+                    `🎯 Total claims : ${totalClaims}`;
+                document.getElementById('historyFinalBalance').textContent = 
+                    `💵 Solde final : ${finalBalance}`;
+
+                histModal.classList.add('active');
+                currentHistoryAccount = account;
+                btnPause.textContent = account.enabled ? '⏸️ Pause' : '▶️ Reprendre';
             }
 
             btnAdd.addEventListener('click', () => openModal('➕ Ajouter un compte'));

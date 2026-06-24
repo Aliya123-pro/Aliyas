@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+try { require('dotenv').config(); } catch (e) {}
 
 // ---------- Variables d'environnement ----------
 const email = process.env.TEST_EMAIL;
@@ -91,7 +92,7 @@ function timeStrToMinutes(str) {
 // --- Remplissage humain ---
 async function fillFieldHuman(page, selector, value, fieldName) {
     console.log(`⌨️ Remplissage humain de ${fieldName}...`);
-    await page.waitForSelector(selector, { visible: true, timeout: 10000 });
+    await page.waitForSelector(selector, { visible: true, timeout: 15000 });
     await page.click(selector, { clickCount: 3 });
     await page.keyboard.press('Backspace');
     await randomDelay(100, 200);
@@ -425,7 +426,26 @@ async function run() {
         ffmpegProcess = startFFmpeg(videoPath);
         await delay(1000);
 
-        const loginUrl = `https://${platform}.io/login.php`;
+        
+
+        // Remplacer la ligne :
+// const loginUrl = `https://${platform}.io/login.php`;
+
+// Par ce bloc (juste avant la ligne `console.log('🌐 Connexion à ${loginUrl}');`) :
+
+const loginUrls = {
+    tronpick: 'https://tronpick.io/login.php',
+    '1xbet': 'https://1x-bet.mobi/fr/virtualsports',
+    litepick: 'https://litepick.io/login.php',
+    dogepick: 'https://dogepick.io/login.php',
+    solpick: 'https://solpick.io/login.php',
+    bnbpick: 'https://bnbpick.io/login.php',
+    tonpick: 'https://tonpick.game/login.php',   // ← spécifique
+    suipick: 'https://suipick.io/login.php',
+    polpick: 'https://polpick.io/login.php'
+};
+const loginUrl = loginUrls[platform] || `https://${platform}.io/login.php`;
+
         console.log(`🌐 Connexion à ${loginUrl}`);
         await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
@@ -434,8 +454,39 @@ async function run() {
         const cookies = await page.cookies();
         console.log(`🍪 Cookies récupérés : ${cookies.length}`);
 
+        // Lire le solde après connexion
+        let initialBalance = 0;
+        try {
+            initialBalance = await page.$eval('[class*="balance"]', el => parseFloat(el.textContent.replace(/[^0-9.]/g, '')));
+        } catch (e) {
+            try {
+                await page.goto(`https://${platform}.io/faucet.php`, { waitUntil: 'networkidle2', timeout: 30000 });
+                await delay(5000);
+                initialBalance = await page.$eval('[class*="balance"]', el => parseFloat(el.textContent.replace(/[^0-9.]/g, '')));
+            } catch (e2) {
+                console.warn('⚠️ Impossible de lire le solde initial');
+            }
+        }
+
         await stopFFmpeg(ffmpegProcess);
         await browser.close();
+
+        // Charger le compte existant (pour conserver createdAt, initialBalance, etc.)
+        let existingAccount = null;
+        try {
+            if (USER_ID) {
+                const existingRes = await octokit.repos.getContent({
+                    owner: GH_USERNAME, repo: GH_REPO, path: USER_FILE, ref: GH_BRANCH
+                });
+                existingAccount = JSON.parse(Buffer.from(existingRes.data.content, 'base64').toString('utf8'));
+            }
+        } catch (e) {
+            // Le fichier n'existe pas encore
+        }
+
+        const createdAt = existingAccount?.createdAt || Date.now();
+        const savedInitialBalance = existingAccount?.initialBalance ?? initialBalance;
+        const savedTotalClaims = existingAccount?.totalClaims ?? 0;
 
         const timerValue = timeStrToMinutes(initialTimerStr);
         const account = {
@@ -447,7 +498,11 @@ async function run() {
             cookies,
             cookiesStatus: 'valid',
             lastClaim: Date.now(),
-            timer: timerValue
+            timer: timerValue,
+            createdAt,
+            initialBalance: savedInitialBalance,
+            totalClaims: savedTotalClaims,
+            finalBalance: initialBalance
         };
 
         await saveAccount(account);

@@ -1,9 +1,11 @@
-// script.js – Version finale complète avec toutes les corrections
+// script.js – Claim avec cookies (3 tentatives Turnstile, timer 2 min si échec)
 const { connect } = require('puppeteer-real-browser');
 const { Octokit } = require('@octokit/rest');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+
+try { require('dotenv').config(); } catch (e) {}
 
 // ---------- Configuration ----------
 const GH_TOKEN = process.env.GH_TOKEN;
@@ -174,11 +176,12 @@ async function claimWithCookies(account) {
     const faucetUrls = {
         tronpick: 'https://tronpick.io/faucet.php',
         litepick: 'https://litepick.io/faucet.php',
-        polpick: 'https://polpick.io/faucet.php',
         dogepick: 'https://dogepick.io/faucet.php',
         solpick: 'https://solpick.io/faucet.php',
         bnbpick: 'https://bnbpick.io/faucet.php',
-        suipick: 'https://suipick.io/faucet.php'
+        tonpick: 'https://tonpick.game/faucet.php',
+        suipick: 'https://suipick.io/faucet.php',
+        polpick: 'https://polpick.io/faucet.php'
     };
     const faucetUrl = faucetUrls[CLAIM_PLATFORM] || 'https://tronpick.io/faucet.php';
 
@@ -189,7 +192,7 @@ async function claimWithCookies(account) {
             const options = {
                 headless: false,
                 turnstile: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+                args: ['--no-sandbox']
             };
             if (proxyConfig.username && proxyConfig.password) {
                 options.proxy = { server: proxyConfig.server, username: proxyConfig.username, password: proxyConfig.password };
@@ -228,12 +231,11 @@ async function claimWithCookies(account) {
             await delay(20000);
             await page.screenshot({ path: path.join(screenshotsDir, '02_page_faucet.png') });
 
-            // Cookies expirés
             if (page.url().includes('login.php')) {
                 console.error('❌ Cookies expirés');
                 account.cookiesStatus = 'expired';
-                account.timer = 120;
                 account.lastClaim = Date.now();
+                account.timer = 120;
                 await saveAccount(account);
                 await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
                 return { success: false, message: 'Cookies expirés' };
@@ -291,54 +293,60 @@ async function claimWithCookies(account) {
                 return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             });
             if (!claimCoords || claimCoords.x === 0 || claimCoords.y === 0) {
-                throw new Error('❌ Impossible d\'obtenir les coordonnées du bouton Claim (bouton invisible ?)');
+                throw new Error('❌ Impossible d\'obtenir les coordonnées du bouton Claim');
             }
             console.log(`📍 Bouton Claim visible à (${Math.round(claimCoords.x)}, ${Math.round(claimCoords.y)})`);
 
-            // Gestion du Turnstile (avec ou sans select)
-            const selectExists = await page.$('select');
-            if (selectExists) {
-                console.log('🔍 Select captcha présent, sélection de Turnstile...');
-                const availableOptions = await page.$$eval('select option', opts =>
-                    opts.map(o => ({ text: o.textContent.trim(), value: o.value }))
-                );
-                const targetOption = availableOptions.find(o => o.text === 'Cloudflare Turnstile');
-                if (targetOption) {
-                    await page.select('select', targetOption.value);
-                    console.log('✅ Turnstile sélectionné');
-                    await delay(5000);
-                    await page.screenshot({ path: path.join(screenshotsDir, '04_turnstile_selectionne.png') });
-                } else {
-                    console.log('⚠️ Option Turnstile non trouvée, on continue sans sélection');
-                    await page.screenshot({ path: path.join(screenshotsDir, '04_pas_de_select.png') });
-                }
-            } else {
-                console.log('ℹ️ Aucun select captcha, Turnstile déjà intégré');
-                await page.screenshot({ path: path.join(screenshotsDir, '04_pas_de_select.png') });
-            }
-
-            // Clic Turnstile (70px au‑dessus)
-            await humanClickAt(page, { x: claimCoords.x, y: claimCoords.y - 70 });
-            console.log('⏳ Attente du token Turnstile...');
-            await delay(3000);
-
-            const tokenStart = Date.now();
+            // --- RÉSOLUTION DU TURNSTILE (max 3 tentatives, 30s par tentative) ---
+            const TURNSTILE_RETRIES = 3;
             let tokenFound = false;
-            while (Date.now() - tokenStart < 30000) {
-                const token = await page.evaluate(() => {
-                    const input = document.querySelector('[name="cf-turnstile-response"]');
-                    return input ? input.value : null;
-                });
-                if (token && token.trim().length > 0) {
-                    console.log('✅ Token Turnstile détecté');
-                    await delay(2000);
-                    tokenFound = true;
-                    break;
+
+            for (let retry = 1; retry <= TURNSTILE_RETRIES; retry++) {
+                // Vérifier / sélectionner Turnstile si un select existe
+                const selectNow = await page.$('select');
+                if (selectNow) {
+                    const opts = await page.$$eval('select option', els => els.map(o => ({ text: o.textContent.trim(), value: o.value })));
+                    const turnstileOpt = opts.find(o => o.text === 'Cloudflare Turnstile');
+                    if (turnstileOpt) {
+                        await page.select('select', turnstileOpt.value);
+                        console.log('🔁 Turnstile resélectionné');
+                        await delay(2000);
+                    } else {
+                        console.log('⚠️ Option Turnstile non trouvée dans le select');
+                    }
                 }
-                await delay(2000);
+
+                // Clic sur la zone Turnstile (70px au‑dessus du bouton Claim)
+                console.log(`🖱️ Clic Turnstile (tentative ${retry}/${TURNSTILE_RETRIES}) à (${Math.round(claimCoords.x)}, ${Math.round(claimCoords.y - 70)})`);
+                await humanClickAt(page, { x: claimCoords.x, y: claimCoords.y - 70 });
+                await delay(3000);
+
+                const start = Date.now();
+                while (Date.now() - start < 30000) {
+                    const token = await page.evaluate(() => {
+                        const input = document.querySelector('[name="cf-turnstile-response"]');
+                        return input ? input.value : null;
+                    });
+                    if (token && token.trim().length > 0) {
+                        console.log('✅ Token Turnstile détecté');
+                        await delay(2000);
+                        tokenFound = true;
+                        break;
+                    }
+                    await delay(2000);
+                }
+                if (tokenFound) break;
+                console.warn(`⚠️ Token non apparu après tentative ${retry}/${TURNSTILE_RETRIES}`);
             }
+
             if (!tokenFound) {
-                console.warn('⚠️ Token Turnstile non apparu, on tente le clic Claim quand même');
+                // Aucun token après 3 tentatives → abandon avec timer court
+                console.error('❌ Token Turnstile non résolu après 3 tentatives');
+                account.lastClaim = Date.now();
+                account.timer = 2;   // timer de 2 minutes
+                await saveAccount(account);
+                await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, false, 0);
+                return { success: false, message: 'Échec Turnstile (3 essais)' };
             }
 
             await page.screenshot({ path: path.join(screenshotsDir, '05_token_detecte.png') });
@@ -351,6 +359,8 @@ async function claimWithCookies(account) {
             await humanClickAt(page, claimCoords);
             console.log('🖱️ Clic sur le bouton Claim effectué');
             await page.screenshot({ path: path.join(screenshotsDir, '06_apres_clic_claim.png') });
+
+            
 
             // Détection du résultat
             const claimResult = await Promise.race([
@@ -394,6 +404,15 @@ async function claimWithCookies(account) {
                 console.log('⚠️ Statut incertain');
             }
 
+            // ⭐ Lire le solde après le claim (indispensable pour l'historique)
+            let balance = 0;
+            try {
+                balance = await page.$eval('[class*="balance"]', el => parseFloat(el.textContent.replace(/[^0-9.]/g, '')));
+                console.log(`💰 Solde après claim : ${balance}`);
+            } catch (e) {
+                console.warn('⚠️ Impossible de lire le solde après le claim');
+            }
+
             // Règle de timer FORCÉE
             if (success || (!isError && !success)) {
                 let newTimer = await extractTimer(page);
@@ -404,8 +423,14 @@ async function claimWithCookies(account) {
             }
             account.lastClaim = Date.now();
 
+            // ✅ Mise à jour de l'historique simplifié
+            if (success) {
+                account.totalClaims = (account.totalClaims || 0) + 1;
+            }
+            account.finalBalance = balance;
+
             await saveAccount(account);
-            await addHistoryEntry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, 0);
+    
             return { success, message: resultMessage || (success ? 'Claim OK' : 'Échec') };
 
         } catch (err) {
@@ -422,10 +447,16 @@ async function claimWithCookies(account) {
 (async () => {
     try {
         const account = await loadAccount();
-        if (!account) {
-            console.error('❌ Compte introuvable');
-            process.exit(1);
-        }
+if (!account) {
+    console.error('❌ Compte introuvable');
+    process.exit(1);
+}
+
+// 🔄 Initialiser les champs d'historique s'ils n'existent pas (anciens comptes)
+if (account.totalClaims === undefined) account.totalClaims = 0;
+if (account.initialBalance === undefined) account.initialBalance = 0;
+if (account.finalBalance === undefined) account.finalBalance = 0;
+
         console.log(`📋 Compte chargé : ${account.email} (${account.platform})`);
 
         const result = await claimWithCookies(account);

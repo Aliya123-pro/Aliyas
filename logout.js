@@ -3,6 +3,7 @@ const { Octokit } = require('@octokit/rest');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+try { require('dotenv').config(); } catch (e) {}
 
 const email = process.env.LOGOUT_EMAIL;
 const platform = process.env.LOGOUT_PLATFORM;
@@ -208,9 +209,20 @@ async function performNormalLogout(accountCookies) {
     try {
         await page.setViewport({ width: 1280, height: 720 });
         await page.setCookie(...accountCookies);
-        console.log('💉 Cookies injectés.');
+        console.log('💉 Cookies injectés.')
 
-        const faucetUrl = `https://${platform}.io/faucet.php`;
+const faucetUrls = {
+    tronpick: 'https://tronpick.io/faucet.php',
+    litepick: 'https://litepick.io/faucet.php',
+    dogepick: 'https://dogepick.io/faucet.php',
+    solpick: 'https://solpick.io/faucet.php',
+    bnbpick: 'https://bnbpick.io/faucet.php',
+    tonpick: 'https://tonpick.game/faucet.php',   // ← cas particulier
+    suipick: 'https://suipick.io/faucet.php',
+    polpick: 'https://polpick.io/faucet.php'
+};
+const faucetUrl = faucetUrls[platform] || `https://${platform}.io/faucet.php`;
+
         await page.goto(faucetUrl, { waitUntil: 'networkidle2', timeout: 30000 });
         console.log('⏳ Attente 20 secondes...');
         await delay(20000);

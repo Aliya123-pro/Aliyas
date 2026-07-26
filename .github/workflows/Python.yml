@@ -1,0 +1,34 @@
+name: Build System Docker Image
+
+on:
+  workflow_dispatch:  # permet aussi de lancer manuellement si besoin
+  push:
+    branches: [main]
+    paths:
+      - "Dockerfile"
+      - "requirements.txt"
+      - "**.py"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Se connecter à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construire et pousser l'image système
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/camoufox-system:latest

@@ -3,125 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finoana Claim – Connexion</title>
+    <title>Connexion – Espace sécurisé</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #f0f4f8;
+            /* -- Palette : bleu institutionnel + accent sauge, pensée assurance/confiance -- */
+            --navy-950: #0c1f33;
+            --navy-900: #10283f;
+            --navy-800: #17385a;
+            --blue-600: #1d5fa8;
+            --blue-700: #164a87;
+            --sage-400: #3fae94;
+            --sage-300: #6fc4ae;
+            --bg: #f4f7fb;
             --card-bg: #ffffff;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --success: #10b981;
-            --danger: #ef4444;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --border: #e2e8f0;
-            --radius: 12px;
-            --shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-            --transition: 0.2s ease;
+            --text: #142438;
+            --text-light: #5c6b81;
+            --text-faint: #8b97a9;
+            --border: #e2e8f1;
+            --border-soft: #edf1f6;
+            --danger: #c0442f;
+            --danger-bg: #fbeeec;
+            --success: #1f8f68;
+            --success-bg: #eaf6f0;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            --shadow-card: 0 30px 60px -20px rgba(12, 31, 51, 0.25), 0 4px 12px rgba(12, 31, 51, 0.06);
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
         }
+ 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+        html, body {
+            height: 100%;
+        }
+ 
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #eef2ff 0%, #f4f6f9 100%);
+            background: var(--bg);
             color: var(--text);
             min-height: 100vh;
             display: flex;
-            align-items: center;
+            align-items: stretch;
             justify-content: center;
-            padding: 20px;
             -webkit-font-smoothing: antialiased;
         }
-        .login-container {
-            background: var(--card-bg);
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            padding: 40px 36px;
+ 
+        /* ============ Mise en page générale : deux volets ============ */
+        .app-shell {
             width: 100%;
-            max-width: 420px;
-            transition: all var(--transition);
+            max-width: 1180px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: minmax(0, 0.98fr) minmax(0, 1fr);
+            min-height: 660px;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: var(--shadow-card);
+            background: var(--card-bg);
+        }
+ 
+        /* ============ Volet gauche : identité institutionnelle ============ */
+        .brand-panel {
+            position: relative;
+            background:
+                radial-gradient(120% 140% at 15% 0%, rgba(63, 174, 148, 0.16), transparent 55%),
+                linear-gradient(165deg, var(--navy-950) 0%, var(--navy-900) 48%, var(--navy-800) 100%);
+            color: #eaf1f8;
+            padding: 56px 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+        }
+ 
+        .brand-panel::before {
+            /* motif de dossiers empilés — signature graphique du volet */
+            content: "";
+            position: absolute;
+            right: -60px;
+            bottom: -40px;
+            width: 340px;
+            height: 340px;
+            background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 300' fill='none'%3E%3Crect x='60' y='150' width='170' height='110' rx='10' fill='%23ffffff' fill-opacity='0.04' stroke='%23ffffff' stroke-opacity='0.10' stroke-width='1.5'/%3E%3Crect x='40' y='120' width='170' height='110' rx='10' fill='%23ffffff' fill-opacity='0.05' stroke='%23ffffff' stroke-opacity='0.14' stroke-width='1.5'/%3E%3Crect x='20' y='90' width='170' height='110' rx='10' fill='%23ffffff' fill-opacity='0.07' stroke='%23ffffff' stroke-opacity='0.20' stroke-width='1.5'/%3E%3Cpath d='M52 130h60M52 145h100M52 160h80' stroke='%23ffffff' stroke-opacity='0.22' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='150' cy='108' r='16' fill='%233fae94' fill-opacity='0.85'/%3E%3Cpath d='M143 108l5 5 9-10' stroke='%230c1f33' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-size: contain;
+            pointer-events: none;
+        }
+ 
+        .brand-mark {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+ 
+        .brand-mark-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(155deg, var(--sage-300), var(--sage-400));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+ 
+        .brand-mark-icon svg { width: 20px; height: 20px; }
+ 
+        .brand-mark-text {
+            font-family: 'Fraunces', serif;
+            font-weight: 600;
+            font-size: 1.15rem;
+            letter-spacing: -0.2px;
+            color: #ffffff;
+        }
+ 
+        .brand-copy {
+            position: relative;
+            z-index: 1;
+            max-width: 380px;
+            margin-top: 48px;
+        }
+ 
+        .brand-copy h2 {
+            font-family: 'Fraunces', serif;
+            font-weight: 600;
+            font-size: 2.1rem;
+            line-height: 1.22;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+        }
+ 
+        .brand-copy p {
+            margin-top: 16px;
+            font-size: 0.98rem;
+            line-height: 1.6;
+            color: #b9c8db;
+        }
+ 
+        .trust-list {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-top: 40px;
+        }
+ 
+        .trust-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.86rem;
+            color: #cdd9e8;
+        }
+ 
+        .trust-item .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--sage-300);
+            flex-shrink: 0;
+        }
+ 
+        .brand-footer {
+            position: relative;
+            z-index: 1;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.72rem;
+            color: #7e93ac;
+            letter-spacing: 0.3px;
+        }
+ 
+        /* ============ Volet droit : formulaire ============ */
+        .form-panel {
+            padding: 56px 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
             position: relative;
             overflow: hidden;
         }
-        .logo {
-            text-align: center;
-            margin-bottom: 28px;
+ 
+        .form-inner {
+            width: 100%;
+            max-width: 340px;
+            margin: 0 auto;
+            position: relative;
         }
-        .logo-icon { font-size: 2.2rem; margin-bottom: 6px; color: var(--primary); }
-        .logo h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.3px; color: var(--text); }
-        .logo p { font-size: 0.85rem; color: var(--text-light); margin-top: 4px; }
-
-        /* Panneaux coulissants */
+ 
+        .form-heading { margin-bottom: 30px; }
+ 
+        .form-heading .eyebrow {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--sage-400);
+            font-weight: 500;
+        }
+ 
+        .form-heading h1 {
+            font-family: 'Fraunces', serif;
+            font-size: 1.6rem;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin-top: 8px;
+            color: var(--text);
+        }
+ 
+        .form-heading p {
+            font-size: 0.88rem;
+            color: var(--text-light);
+            margin-top: 6px;
+        }
+ 
+        /* Panneaux : un seul panneau visible à la fois, sans superposition ni espace résiduel */
         .panel {
-            transition: transform 0.4s ease, opacity 0.3s ease;
             width: 100%;
         }
-        .login-panel {
-            transform: translateX(0);
-            opacity: 1;
+        .panel.is-hidden {
+            display: none;
         }
-        .signup-panel {
-            position: absolute;
-            top: 120px;
-            left: 36px;
-            right: 36px;
-            transform: translateX(120%);
-            opacity: 0;
-            pointer-events: none;
+        .panel.is-entering {
+            animation: panelIn 0.32s var(--ease);
         }
-        .container.signup-active .login-panel {
-            transform: translateX(-120%);
-            opacity: 0;
-            pointer-events: none;
+        @keyframes panelIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .container.signup-active .signup-panel {
-            transform: translateX(0);
-            opacity: 1;
-            pointer-events: auto;
-            position: relative;
-            top: 0;
-        }
-
-        .form-group { margin-bottom: 20px; position: relative; }
-
+ 
+        .form-group { margin-bottom: 18px; position: relative; }
+ 
         /* Connexion : labels fixes */
         .login-panel .form-group label {
             display: block;
-            margin-bottom: 6px;
+            margin-bottom: 7px;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: var(--text);
+            letter-spacing: 0.55px;
+            color: var(--text-light);
         }
         .login-panel .form-group input {
             width: 100%;
-            padding: 14px 16px;
+            padding: 13px 15px;
             border: 1.5px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius-sm);
             font-size: 0.95rem;
-            background: #fafbfc;
-            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            font-family: inherit;
+            background: #fbfcfe;
+            transition: border 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease);
             outline: none;
             color: var(--text);
         }
         .login-panel .form-group input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            border-color: var(--blue-600);
+            box-shadow: 0 0 0 3.5px rgba(29, 95, 168, 0.13);
             background: #fff;
         }
-
-        /* Inscription : labels flottants améliorés */
+ 
+        /* Inscription : labels flottants */
         .signup-panel .form-group {
-            margin-bottom: 26px;
+            margin-bottom: 22px;
         }
         .signup-panel .form-group label {
             position: absolute;
-            left: 16px;
-            top: 16px;
+            left: 15px;
+            top: 14px;
             font-size: 0.9rem;
-            color: var(--text-light);
+            color: var(--text-faint);
             pointer-events: none;
-            transition: all 0.2s ease;
+            transition: all 0.18s var(--ease);
             background: transparent;
             padding: 0 4px;
             transform-origin: left top;
@@ -129,30 +287,30 @@
         }
         .signup-panel .form-group input {
             width: 100%;
-            padding: 18px 16px 10px 16px;
+            padding: 17px 15px 9px 15px;
             border: 1.5px solid var(--border);
-            border-radius: 10px;
+            border-radius: var(--radius-sm);
             font-size: 0.95rem;
-            background: #fafbfc;
-            transition: border var(--transition), box-shadow var(--transition), background var(--transition);
+            font-family: inherit;
+            background: #fbfcfe;
+            transition: border 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease);
             outline: none;
             color: var(--text);
             position: relative;
             z-index: 0;
         }
         .signup-panel .form-group input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+            border-color: var(--blue-600);
+            box-shadow: 0 0 0 3.5px rgba(29, 95, 168, 0.13);
             background: #fff;
         }
-        /* Déplacement du label quand l'input est focus ou rempli */
         .signup-panel .form-group input:focus + label,
         .signup-panel .form-group input:not(:placeholder-shown) + label {
-            top: -10px;
-            left: 12px;
-            font-size: 0.7rem;
+            top: -9px;
+            left: 11px;
+            font-size: 0.68rem;
             font-weight: 600;
-            color: var(--primary);
+            color: var(--blue-600);
             background: #fff;
             padding: 0 6px;
             border-radius: 4px;
@@ -161,65 +319,93 @@
         .signup-panel .form-group input::placeholder {
             color: transparent;
         }
-
+ 
         .password-wrapper { position: relative; }
         .toggle-password {
             position: absolute;
-            right: 12px;
+            right: 6px;
             top: 50%;
             transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
             background: none;
             border: none;
+            border-radius: 7px;
             cursor: pointer;
-            font-size: 1.2rem;
-            color: var(--text-light);
-            padding: 4px;
-            transition: color var(--transition);
+            color: var(--text-faint);
+            padding: 0;
+            transition: color 0.2s var(--ease), background 0.2s var(--ease);
             z-index: 2;
         }
-        .toggle-password:hover { color: var(--primary); }
-
+        .toggle-password svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
+        .toggle-password:hover {
+            color: var(--blue-600);
+            background: rgba(29, 95, 168, 0.08);
+        }
+        /* Le CSS seul décide quelle icône afficher, selon le type du champ associé */
+        .toggle-password .icon-open,
+        .toggle-password .icon-closed {
+            width: 18px;
+            height: 18px;
+        }
+        .toggle-password .icon-closed { display: none; }
+        input[type="password"] + .toggle-password .icon-open { display: block; }
+        input[type="password"] + .toggle-password .icon-closed { display: none; }
+        input[type="text"] + .toggle-password .icon-open { display: none; }
+        input[type="text"] + .toggle-password .icon-closed { display: block; }
+ 
         .error-message, .success-message {
             font-size: 0.8rem;
-            margin-top: 6px;
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
             display: none;
             line-height: 1.4;
         }
-        .error-message { color: var(--danger); }
-        .success-message { color: var(--success); font-weight: 500; }
+        .error-message { color: var(--danger); background: var(--danger-bg); }
+        .success-message { color: var(--success); background: var(--success-bg); font-weight: 500; }
         .visible { display: block; }
-
+ 
         .btn-primary {
             width: 100%;
-            padding: 14px;
-            border-radius: 10px;
+            padding: 13px;
+            border-radius: var(--radius-sm);
             border: none;
             font-weight: 600;
             cursor: pointer;
-            font-size: 1rem;
-            background: var(--primary);
+            font-size: 0.95rem;
+            font-family: inherit;
+            background: var(--blue-600);
             color: white;
-            transition: background var(--transition), transform var(--transition);
-            letter-spacing: 0.3px;
-            margin-top: 12px;
+            transition: background 0.2s var(--ease), transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+            letter-spacing: 0.2px;
+            margin-top: 6px;
+            box-shadow: 0 8px 20px -8px rgba(29, 95, 168, 0.55);
         }
-        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+        .btn-primary:hover { background: var(--blue-700); transform: translateY(-1px); }
         .btn-primary:active { transform: translateY(0); }
-        .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; transform: none; }
-
-        .toggle-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-light); }
-        .toggle-link a { color: var(--primary); text-decoration: none; font-weight: 600; }
+        .btn-primary:disabled { background: #a6b3c2; cursor: not-allowed; transform: none; box-shadow: none; }
+ 
+        .toggle-link { text-align: center; margin-top: 24px; font-size: 0.87rem; color: var(--text-light); }
+        .toggle-link a { color: var(--blue-600); text-decoration: none; font-weight: 600; }
         .toggle-link a:hover { text-decoration: underline; }
-
-        .forgot-password { text-align: right; margin-bottom: 6px; }
-        .forgot-password a { font-size: 0.8rem; color: var(--primary); text-decoration: none; }
+ 
+        .forgot-password { text-align: right; margin-top: 8px; margin-bottom: 4px; }
+        .forgot-password a { font-size: 0.78rem; color: var(--blue-600); text-decoration: none; }
         .forgot-password a:hover { text-decoration: underline; }
-
+ 
         .spinner {
             display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.35);
             border-top-color: white;
             border-radius: 50%;
             animation: spin 0.6s linear infinite;
@@ -227,85 +413,163 @@
             vertical-align: middle;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        .version { text-align: center; margin-top: 24px; font-size: 0.7rem; color: var(--text-light); }
+ 
+        .form-footer-note {
+            text-align: center;
+            margin-top: 28px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-faint);
+            letter-spacing: 0.3px;
+        }
+ 
         .hidden { display: none; }
+ 
+        /* ============ Responsive ============ */
+        @media (max-width: 880px) {
+            body { padding: 0; align-items: flex-start; }
+            .app-shell {
+                grid-template-columns: 1fr;
+                border-radius: 0;
+                min-height: 100vh;
+                box-shadow: none;
+            }
+            .brand-panel {
+                padding: 36px 28px 32px;
+            }
+            .brand-panel::before {
+                width: 220px;
+                height: 220px;
+                right: -50px;
+                bottom: -40px;
+                opacity: 0.7;
+            }
+            .brand-copy { margin-top: 28px; }
+            .brand-copy h2 { font-size: 1.5rem; }
+            .trust-list { display: none; }
+            .form-panel { padding: 40px 28px 48px; }
+        }
+ 
+        @media (prefers-reduced-motion: reduce) {
+            .panel.is-entering { animation: none; }
+            .btn-primary:hover { transform: none; }
+        }
+ 
+        /* Focus visible clavier */
+        a:focus-visible, button:focus-visible, input:focus-visible {
+            outline: 2px solid var(--blue-600);
+            outline-offset: 2px;
+        }
     </style>
 </head>
 <body>
-    <div class="login-container container" id="mainContainer">
-        <div class="logo">
-            <div class="logo-icon">⚙️</div>
-            <h1>Finoana Claim</h1>
-            <p id="formDescription">Connectez-vous à votre compte</p>
+    <div class="app-shell">
+        <!-- Volet institutionnel -->
+        <aside class="brand-panel">
+            <div class="brand-mark">
+                <span class="brand-mark-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2 4 5v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10V5l-8-3Z" stroke="#0c1f33" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="#0c1f33" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span class="brand-mark-text">Espace Réclamations</span>
+            </div>
+ 
+            <div class="brand-copy">
+                <h2>Chaque dossier compte. Chaque décision aussi.</h2>
+                <p>La plateforme de gestion des réclamations pensée pour la clarté, la traçabilité et la rapidité de traitement.</p>
+            </div>
+ 
+            <div class="trust-list">
+                <div class="trust-item"><span class="dot"></span>Chiffrement de bout en bout</div>
+                <div class="trust-item"><span class="dot"></span>Historique et traçabilité complets des dossiers</div>
+                <div class="trust-item"><span class="dot"></span>Support dédié, 7 jours sur 7</div>
+            </div>
+ 
+            <div class="brand-footer">PLATEFORME SÉCURISÉE · ACCÈS CHIFFRÉ</div>
+        </aside>
+ 
+        <!-- Volet formulaire -->
+        <div class="form-panel">
+            <div class="form-inner login-container container" id="mainContainer">
+                <div class="form-heading">
+                    <div class="eyebrow">Accès professionnel</div>
+                    <h1 id="formTitle">Bon retour</h1>
+                    <p id="formDescription">Connectez-vous à votre compte</p>
+                </div>
+ 
+                <!-- Panneau Connexion -->
+                <div class="panel login-panel" id="loginPanel">
+                    <form id="loginForm" novalidate>
+                        <div class="form-group">
+                            <label for="loginEmail">Adresse email</label>
+                            <input type="email" id="loginEmail" placeholder="vous@exemple.com" required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Mot de passe</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+                                <button type="button" class="toggle-password" data-target="loginPassword" aria-label="Afficher le mot de passe" aria-pressed="false">
+                                    <svg class="icon-open" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+                                    <svg class="icon-closed" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10.6 5.2A10.8 10.8 0 0 1 12 5c7 0 10.5 7 10.5 7a15.6 15.6 0 0 1-3.3 4.3M6.6 6.7C3.6 8.5 1.5 12 1.5 12s3.5 7 10.5 7c1.4 0 2.6-.25 3.7-.66" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.9 10.1a3 3 0 0 0 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
+                            </div>
+                            <div class="forgot-password">
+                                <a href="#" id="forgotPasswordLink">Mot de passe oublié ?</a>
+                            </div>
+                        </div>
+                        <div class="error-message" id="loginError"></div>
+                        <button type="submit" class="btn-primary" id="loginBtn">
+                            <span id="loginBtnText">Se connecter</span>
+                        </button>
+                    </form>
+                </div>
+ 
+                <!-- Panneau Inscription -->
+                <div class="panel signup-panel is-hidden" id="signupPanel">
+                    <form id="signupForm" novalidate>
+                        <div class="form-group">
+                            <label for="signupUsername">Nom d'utilisateur</label>
+                            <input type="text" id="signupUsername" placeholder=" " required autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label for="signupEmail">Adresse email</label>
+                            <input type="email" id="signupEmail" placeholder=" " required autocomplete="email">
+                        </div>
+                        <div class="form-group">
+                            <label for="signupPassword">Mot de passe</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="signupPassword" placeholder=" " required autocomplete="new-password">
+                                <button type="button" class="toggle-password" data-target="signupPassword" aria-label="Afficher le mot de passe" aria-pressed="false">
+                                    <svg class="icon-open" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6"/></svg>
+                                    <svg class="icon-closed" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3l18 18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M10.6 5.2A10.8 10.8 0 0 1 12 5c7 0 10.5 7 10.5 7a15.6 15.6 0 0 1-3.3 4.3M6.6 6.7C3.6 8.5 1.5 12 1.5 12s3.5 7 10.5 7c1.4 0 2.6-.25 3.7-.66" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.9 10.1a3 3 0 0 0 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="signupConfirmPassword">Confirmer le mot de passe</label>
+                            <input type="password" id="signupConfirmPassword" placeholder=" " required autocomplete="new-password">
+                        </div>
+                        <div class="error-message" id="signupError"></div>
+                        <div class="success-message" id="signupSuccess"></div>
+                        <button type="submit" class="btn-primary" id="signupBtn">
+                            <span id="signupBtnText">Créer un compte</span>
+                        </button>
+                    </form>
+                </div>
+ 
+                <div class="toggle-link">
+                    <span id="toggleText">Pas encore de compte ?</span>
+                    <a href="#" id="toggleAuth">Créer un compte</a>
+                </div>
+ 
+                <div class="form-footer-note">v2.0 · Interface sécurisée</div>
+            </div>
         </div>
-
-        <!-- Panneau Connexion -->
-        <div class="panel login-panel" id="loginPanel">
-            <form id="loginForm" novalidate>
-                <div class="form-group">
-                    <label for="loginEmail">Adresse email</label>
-                    <input type="email" id="loginEmail" placeholder="vous@exemple.com" required autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="loginPassword">Mot de passe</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
-                        <button type="button" class="toggle-password" data-target="loginPassword">👁️</button>
-                    </div>
-                    <div class="forgot-password">
-                        <a href="#" id="forgotPasswordLink">Mot de passe oublié ?</a>
-                    </div>
-                </div>
-                <div class="error-message" id="loginError"></div>
-                <button type="submit" class="btn-primary" id="loginBtn">
-                    <span id="loginBtnText">Se connecter</span>
-                </button>
-            </form>
-        </div>
-
-        <!-- Panneau Inscription -->
-        <div class="panel signup-panel" id="signupPanel">
-            <form id="signupForm" novalidate>
-                <div class="form-group">
-                    <label for="signupUsername">Nom d'utilisateur</label>
-                    <input type="text" id="signupUsername" placeholder=" " required autocomplete="username">
-                </div>
-                <div class="form-group">
-                    <label for="signupEmail">Adresse email</label>
-                    <input type="email" id="signupEmail" placeholder=" " required autocomplete="email">
-                </div>
-                <div class="form-group">
-                    <label for="signupPassword">Mot de passe</label>
-                    <div class="password-wrapper">
-                        <input type="password" id="signupPassword" placeholder=" " required autocomplete="new-password">
-                        <button type="button" class="toggle-password" data-target="signupPassword">👁️</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="signupConfirmPassword">Confirmer le mot de passe</label>
-                    <input type="password" id="signupConfirmPassword" placeholder=" " required autocomplete="new-password">
-                </div>
-                <div class="error-message" id="signupError"></div>
-                <div class="success-message" id="signupSuccess"></div>
-                <button type="submit" class="btn-primary" id="signupBtn">
-                    <span id="signupBtnText">Créer un compte</span>
-                </button>
-            </form>
-        </div>
-
-        <div class="toggle-link">
-            <span id="toggleText">Pas encore de compte ?</span>
-            <a href="#" id="toggleAuth">Créer un compte</a>
-        </div>
-
-        <div class="version">v2.0 · Interface sécurisée</div>
     </div>
-
+ 
     <script>
         (function() {
             let mode = 'login';
-
+ 
             const container = document.getElementById('mainContainer');
             const loginForm = document.getElementById('loginForm');
             const signupForm = document.getElementById('signupForm');
@@ -325,55 +589,74 @@
             const toggleAuthLink = document.getElementById('toggleAuth');
             const toggleText = document.getElementById('toggleText');
             const formDescription = document.getElementById('formDescription');
+            const formTitle = document.getElementById('formTitle');
             const forgotPasswordLink = document.getElementById('forgotPasswordLink');
-
-            // Gestion des yeux pour afficher/masquer le mot de passe
+ 
+            // Bascule du type de champ (obligatoire en JS) ; l'icône affichée est gérée entièrement par le CSS ci-dessus
             document.querySelectorAll('.toggle-password').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const targetId = btn.dataset.target;
                     const input = document.getElementById(targetId);
                     const isPass = input.type === 'password';
                     input.type = isPass ? 'text' : 'password';
-                    btn.textContent = isPass ? '🙈' : '👁️';
+                    btn.setAttribute('aria-pressed', isPass ? 'true' : 'false');
+                    btn.setAttribute('aria-label', isPass ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
                 });
             });
-
+ 
+            const loginPanelEl = document.getElementById('loginPanel');
+            const signupPanelEl = document.getElementById('signupPanel');
+ 
+            function showPanel(panelToShow, panelToHide) {
+                panelToHide.classList.add('is-hidden');
+                panelToHide.classList.remove('is-entering');
+                panelToShow.classList.remove('is-hidden');
+                // redémarre l'animation d'entrée à chaque bascule
+                panelToShow.classList.remove('is-entering');
+                void panelToShow.offsetWidth;
+                panelToShow.classList.add('is-entering');
+            }
+ 
             function switchMode(newMode) {
                 mode = newMode;
                 loginError.classList.remove('visible');
                 signupError.classList.remove('visible');
                 signupSuccess.classList.remove('visible');
-
+ 
                 if (mode === 'login') {
                     container.classList.remove('signup-active');
+                    showPanel(loginPanelEl, signupPanelEl);
+                    formTitle.textContent = 'Bon retour';
                     formDescription.textContent = 'Connectez-vous à votre compte';
                     toggleText.textContent = 'Pas encore de compte ?';
                     toggleAuthLink.textContent = 'Créer un compte';
                 } else {
                     container.classList.add('signup-active');
-                    formDescription.textContent = 'Créez votre compte';
+                    showPanel(signupPanelEl, loginPanelEl);
+                    formTitle.textContent = 'Créer un compte';
+                    formDescription.textContent = 'Rejoignez la plateforme en quelques instants';
                     toggleText.textContent = 'Déjà un compte ?';
                     toggleAuthLink.textContent = 'Se connecter';
                 }
             }
-
+ 
             toggleAuthLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 switchMode(mode === 'login' ? 'signup' : 'login');
             });
-
+ 
             function isValidEmail(email) {
                 return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
             }
-
+ 
             // Connexion
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 loginError.classList.remove('visible');
-
+ 
                 const email = loginEmail.value.trim();
                 const password = loginPassword.value;
-
+ 
                 if (!isValidEmail(email)) {
                     loginError.textContent = 'Adresse email invalide.';
                     loginError.classList.add('visible');
@@ -384,10 +667,10 @@
                     loginError.classList.add('visible');
                     return;
                 }
-
+ 
                 loginBtn.disabled = true;
                 loginBtnText.innerHTML = '<span class="spinner"></span> Patientez…';
-
+ 
                 try {
                     const response = await fetch('/api/auth', {
                         method: 'POST',
@@ -395,7 +678,7 @@
                         body: JSON.stringify({ email, password, mode: 'login' })
                     });
                     const data = await response.json();
-
+ 
                     if (!response.ok) {
                         loginError.textContent = data.error || 'Identifiants incorrects';
                         loginError.classList.add('visible');
@@ -403,7 +686,7 @@
                         loginBtnText.textContent = 'Se connecter';
                         return;
                     }
-
+ 
                     localStorage.setItem('auth_token', data.token);
                     window.location.href = '/dashboard.html';
                 } catch (err) {
@@ -413,18 +696,18 @@
                     loginBtnText.textContent = 'Se connecter';
                 }
             });
-
+ 
             // Inscription
             signupForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 signupError.classList.remove('visible');
                 signupSuccess.classList.remove('visible');
-
+ 
                 const username = signupUsername.value.trim();
                 const email = signupEmail.value.trim();
                 const password = signupPassword.value;
                 const confirmPassword = signupConfirmPassword.value;
-
+ 
                 if (!username) {
                     signupError.textContent = 'Le nom d\'utilisateur est requis.';
                     signupError.classList.add('visible');
@@ -445,10 +728,10 @@
                     signupError.classList.add('visible');
                     return;
                 }
-
+ 
                 signupBtn.disabled = true;
                 signupBtnText.innerHTML = '<span class="spinner"></span> Patientez…';
-
+ 
                 try {
                     const response = await fetch('/api/auth', {
                         method: 'POST',
@@ -456,7 +739,7 @@
                         body: JSON.stringify({ email, password, confirmPassword, username, mode: 'signup' })
                     });
                     const data = await response.json();
-
+ 
                     if (!response.ok) {
                         signupError.textContent = data.error || 'Erreur lors de l\'inscription';
                         signupError.classList.add('visible');
@@ -464,15 +747,15 @@
                         signupBtnText.textContent = 'Créer un compte';
                         return;
                     }
-
+ 
                     signupSuccess.textContent = '✅ Compte créé avec succès ! Vous pouvez maintenant vous connecter.';
                     signupSuccess.classList.add('visible');
-
+ 
                     signupUsername.value = '';
                     signupEmail.value = '';
                     signupPassword.value = '';
                     signupConfirmPassword.value = '';
-
+ 
                     setTimeout(() => {
                         switchMode('login');
                     }, 2000);
@@ -484,12 +767,12 @@
                     signupBtnText.textContent = 'Créer un compte';
                 }
             });
-
+ 
             forgotPasswordLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 alert('Fonctionnalité à venir.');
             });
-
+ 
             const existingToken = localStorage.getItem('auth_token');
             if (existingToken) {
                 window.location.href = '/dashboard.html';

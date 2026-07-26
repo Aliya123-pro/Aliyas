@@ -38,8 +38,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     container:
-      image: ghcr.io/${{ github.repository_owner }}/camoufox-system:latest
+      image: ghcr.io/aliya123-pro/camoufox-system:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}

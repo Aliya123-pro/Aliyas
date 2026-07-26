@@ -1,0 +1,5 @@
+PyGithub
+cryptography
+python-dotenv
+playwright
+camoufox[geoip]

@@ -9,9 +9,9 @@
   "lastClaim": 1785081184459,
   "timer": 62,
   "createdAt": 1785066547739,
-  "initialBalance": 1.2e-05,
+  "initialBalance": 0.000012,
   "totalClaims": 4,
-  "finalBalance": 6e-05,
+  "finalBalance": 0.00006,
   "pendingClaim": true,
-  "pendingClaimSince": 1785081071162
+  "pendingClaimSince": 1785084920768
 }

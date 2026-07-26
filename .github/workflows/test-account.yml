@@ -1,4 +1,4 @@
-name: Test Account Login
+name: Test Account Login (Docker)
 
 on:
   workflow_dispatch:
@@ -19,6 +19,7 @@ on:
         description: "Index du proxy (0 par défaut)"
         required: false
         type: string
+        default: "0"
       initialTimer:
         description: "Timer initial (format mm:ss)"
         required: false
@@ -37,40 +38,17 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/camoufox-system:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      # Cache des dépendances npm
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
-
-      # Cache du navigateur Chromium (téléchargé par Puppeteer)
-      - name: Cache Chromium
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/puppeteer
-          key: ${{ runner.os }}-puppeteer-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-puppeteer-
-
-      # Installation des dépendances système (xvfb pour l'affichage, ffmpeg pour la vidéo)
-      - name: Installer les dépendances système
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb ffmpeg
-
-      - name: Installer les dépendances Node
-        run: npm install puppeteer-real-browser @octokit/rest
-
       - name: Exécuter le script de login
+        working-directory: /app
         env:
+          HOME: /home/camoxuser
           DISPLAY: ":99"
           TEST_EMAIL: ${{ github.event.inputs.email }}
           TEST_PASSWORD: ${{ github.event.inputs.password }}
@@ -84,13 +62,5 @@ jobs:
           GH_REPO: ${{ secrets.GH_REPO }}
           GH_BRANCH: ${{ secrets.GH_BRANCH || 'main' }}
           JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
-          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}   # <-- indispensable pour le chiffrement
-        run: xvfb-run --auto-servernum node test-login-workflow.js
-
-      # Optionnel : sauvegarde des vidéos pour déboguer
-      - name: Upload des vidéos
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: login-videos
-          path: videos/
+          CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
+        run: xvfb-run --auto-servernum python test_login_workflow.py

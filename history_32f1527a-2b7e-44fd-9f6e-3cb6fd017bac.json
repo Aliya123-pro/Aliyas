@@ -208,5 +208,12 @@
     "timestamp": 1785161237558,
     "success": true,
     "bonus": 0.0011625
+  },
+  {
+    "email": "irygracia@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1785161294520,
+    "success": true,
+    "bonus": 0.540028
   }
 ]

@@ -838,5 +838,12 @@
     "timestamp": 1785384752466,
     "success": true,
     "bonus": 0.05
+  },
+  {
+    "email": "hrvl0777@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1785385340624,
+    "success": true,
+    "bonus": 0.005875
   }
 ]

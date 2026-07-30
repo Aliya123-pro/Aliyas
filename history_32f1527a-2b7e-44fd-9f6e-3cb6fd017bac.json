@@ -593,5 +593,12 @@
     "timestamp": 1785443550873,
     "success": true,
     "bonus": 0.00125
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "bnbpick",
+    "timestamp": 1785443957349,
+    "success": true,
+    "bonus": 0.00223324
   }
 ]

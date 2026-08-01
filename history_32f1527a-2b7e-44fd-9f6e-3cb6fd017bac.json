@@ -1972,5 +1972,12 @@
     "timestamp": 1785585146896,
     "success": true,
     "bonus": 0.00575
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "dogepick",
+    "timestamp": 1785585480943,
+    "success": true,
+    "bonus": 0.0278
   }
 ]

@@ -1048,5 +1048,12 @@
     "timestamp": 1785824773643,
     "success": true,
     "bonus": 1.5
+  },
+  {
+    "email": "finoanarivoniaina@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1785825671023,
+    "success": true,
+    "bonus": 0.0006
   }
 ]

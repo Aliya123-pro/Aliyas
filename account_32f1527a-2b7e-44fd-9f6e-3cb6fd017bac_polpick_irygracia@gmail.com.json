@@ -12,6 +12,5 @@
   "initialBalance": 1.35083356,
   "totalClaims": 149,
   "finalBalance": 4.83118352,
-  "pendingClaim": true,
-  "pendingClaimSince": 1786031832857
+  "pendingClaim": false
 }

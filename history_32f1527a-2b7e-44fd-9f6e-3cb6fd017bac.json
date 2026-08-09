@@ -1832,5 +1832,12 @@
     "timestamp": 1786277857449,
     "success": true,
     "bonus": 0.46999464
+  },
+  {
+    "email": "irygracia@gmail.com",
+    "platform": "polpick",
+    "timestamp": 1786278147989,
+    "success": true,
+    "bonus": 0.35
   }
 ]

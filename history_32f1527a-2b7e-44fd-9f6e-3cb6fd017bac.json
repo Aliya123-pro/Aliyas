@@ -1265,5 +1265,12 @@
     "timestamp": 1786366359958,
     "success": true,
     "bonus": 0.006625
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "tonpick",
+    "timestamp": 1786366367947,
+    "success": true,
+    "bonus": 1.542672
   }
 ]

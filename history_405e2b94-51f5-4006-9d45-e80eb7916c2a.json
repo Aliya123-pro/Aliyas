@@ -2567,5 +2567,12 @@
     "timestamp": 1786582967904,
     "success": true,
     "bonus": 0.0975
+  },
+  {
+    "email": "finoanarivoniaina@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1786584237043,
+    "success": false,
+    "bonus": 0
   }
 ]

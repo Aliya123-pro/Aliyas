@@ -16938,5 +16938,12 @@
     "timestamp": 1786880411880,
     "success": true,
     "bonus": 0.0085
+  },
+  {
+    "email": "tsiaroezaka@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1786880661657,
+    "success": false,
+    "bonus": 0
   }
 ]

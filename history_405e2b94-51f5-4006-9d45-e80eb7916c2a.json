@@ -5661,5 +5661,12 @@
     "timestamp": 1786981695367,
     "success": true,
     "bonus": 0.22752868
+  },
+  {
+    "email": "hasiniainahasina1@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1786982043896,
+    "success": false,
+    "bonus": 0
   }
 ]

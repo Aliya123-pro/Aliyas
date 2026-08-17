@@ -20151,5 +20151,12 @@
     "timestamp": 1786979332852,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "trade251350@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1786979612875,
+    "success": true,
+    "bonus": 0.00075
   }
 ]

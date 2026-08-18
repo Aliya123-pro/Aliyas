@@ -6627,5 +6627,12 @@
     "timestamp": 1787096944940,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "rhanitriniaina2503@gmail.com",
+    "platform": "tonpick",
+    "timestamp": 1787097180834,
+    "success": true,
+    "bonus": 0.288
   }
 ]

@@ -8090,5 +8090,12 @@
     "timestamp": 1787253041816,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "finoanarivoniaina@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1787253302181,
+    "success": true,
+    "bonus": 0.26652868
   }
 ]

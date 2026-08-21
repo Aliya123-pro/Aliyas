@@ -8671,5 +8671,12 @@
     "timestamp": 1787311638265,
     "success": true,
     "bonus": 0.27492868
+  },
+  {
+    "email": "ruschiajennifer@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1787312071302,
+    "success": false,
+    "bonus": 0
   }
 ]

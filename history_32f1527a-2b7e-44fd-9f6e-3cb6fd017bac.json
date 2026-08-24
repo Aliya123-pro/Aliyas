@@ -39842,5 +39842,12 @@
     "timestamp": 1787580361149,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1787580432017,
+    "success": true,
+    "bonus": 0.0033
   }
 ]

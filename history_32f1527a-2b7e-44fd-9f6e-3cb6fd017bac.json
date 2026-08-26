@@ -635,5 +635,12 @@
     "timestamp": 1787756010424,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "sahytolotra@gmail.com",
+    "platform": "tonpick",
+    "timestamp": 1787756087178,
+    "success": true,
+    "bonus": 0.04375
   }
 ]

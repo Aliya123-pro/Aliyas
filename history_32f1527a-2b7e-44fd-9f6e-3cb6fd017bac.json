@@ -12,5 +12,12 @@
     "timestamp": 1787803394030,
     "success": true,
     "bonus": 0.132
+  },
+  {
+    "email": "rajole245@gmail.com",
+    "platform": "suipick",
+    "timestamp": 1787803499940,
+    "success": false,
+    "bonus": 0
   }
 ]

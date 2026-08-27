@@ -2231,5 +2231,12 @@
     "timestamp": 1787869646208,
     "success": true,
     "bonus": 0.004375
+  },
+  {
+    "email": "andrianaidealy@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1787869970990,
+    "success": true,
+    "bonus": 0.004625
   }
 ]

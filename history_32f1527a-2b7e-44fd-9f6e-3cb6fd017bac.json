@@ -1881,5 +1881,12 @@
     "timestamp": 1787859760969,
     "success": true,
     "bonus": 0.005
+  },
+  {
+    "email": "youmaelrak@gmail.com",
+    "platform": "bnbpick",
+    "timestamp": 1787860041893,
+    "success": true,
+    "bonus": 0.00172809
   }
 ]

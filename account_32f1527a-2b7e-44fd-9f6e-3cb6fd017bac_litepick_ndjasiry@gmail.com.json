@@ -11,7 +11,7 @@
   "createdAt": 1787802147147,
   "initialBalance": 0.00456,
   "totalClaims": 43,
-  "finalBalance": 3e-05,
+  "finalBalance": 0.00003,
   "pendingClaim": true,
-  "pendingClaimSince": 1787978178099
+  "pendingClaimSince": 1787982038002
 }

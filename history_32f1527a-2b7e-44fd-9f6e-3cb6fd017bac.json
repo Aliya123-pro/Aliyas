@@ -96,5 +96,12 @@
     "timestamp": 1788108500210,
     "success": true,
     "bonus": 1.28659769
+  },
+  {
+    "email": "youmaelrak@gmail.com",
+    "platform": "tonpick",
+    "timestamp": 1788108622749,
+    "success": true,
+    "bonus": 0.243
   }
 ]

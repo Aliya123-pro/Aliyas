@@ -6172,5 +6172,12 @@
     "timestamp": 1788283493291,
     "success": true,
     "bonus": 0.00125
+  },
+  {
+    "email": "ndjasiry@gmail.com",
+    "platform": "solpick",
+    "timestamp": 1788284248398,
+    "success": true,
+    "bonus": 0.00066
   }
 ]

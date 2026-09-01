@@ -6543,5 +6543,12 @@
     "timestamp": 1788294510976,
     "success": true,
     "bonus": 0.08125
+  },
+  {
+    "email": "rinaarivelo07@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1788294577678,
+    "success": false,
+    "bonus": 0
   }
 ]

@@ -9658,5 +9658,12 @@
     "timestamp": 1788377669813,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "hsnmail95@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1788377892874,
+    "success": true,
+    "bonus": 0.004
   }
 ]

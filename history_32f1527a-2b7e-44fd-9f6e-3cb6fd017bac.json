@@ -8076,5 +8076,12 @@
     "timestamp": 1788336000161,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "andriatojosonirintsoarolland@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1788336200095,
+    "success": true,
+    "bonus": 1.023936
   }
 ]

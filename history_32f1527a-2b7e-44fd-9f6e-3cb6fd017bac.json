@@ -11065,5 +11065,12 @@
     "timestamp": 1788413061244,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "rasoaniriiina@gmail.com",
+    "platform": "litepick",
+    "timestamp": 1788413241076,
+    "success": true,
+    "bonus": 0.00525
   }
 ]

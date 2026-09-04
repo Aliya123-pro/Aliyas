@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-voanjo.py – Claim de faucet avec cookies (Camoufox + Turnstile)
+voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
 Version corrigée (claim_result défini, imports ajustés)
 """
 

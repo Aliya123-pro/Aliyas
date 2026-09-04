@@ -14628,5 +14628,12 @@
     "timestamp": 1788504554739,
     "success": true,
     "bonus": 0.00108
+  },
+  {
+    "email": "andriatojosonirintsoarolland@gmail.com",
+    "platform": "solpick",
+    "timestamp": 1788504610788,
+    "success": false,
+    "bonus": 0.001065
   }
 ]

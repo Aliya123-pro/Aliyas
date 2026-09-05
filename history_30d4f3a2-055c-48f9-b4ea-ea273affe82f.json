@@ -26,5 +26,12 @@
     "timestamp": 1788602202019,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "hasiniainahasina1@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1788603907188,
+    "success": true,
+    "bonus": 0.29
   }
 ]

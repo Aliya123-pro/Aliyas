@@ -229,7 +229,7 @@ def perform_logout(account_cookies: list):
             "tonpick": "https://tonpick.game/faucet.php",
             "suipick": "https://suipick.io/faucet.php",
             "polpick": "https://polpick.io/faucet.php",
-            "tronlux": "https://tronlux.io/faucet.php",
+            "freetron": "https://https://freetron.in/faucet",
         }
         faucet_url = faucet_urls.get(LOGOUT_PLATFORM, f"https://{LOGOUT_PLATFORM}.io/faucet.php")
 

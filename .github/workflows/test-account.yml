@@ -24,6 +24,16 @@ on:
         required: false
         type: string
         default: "0"
+      initialTimer:
+        description: "Timer initial (ex: 60:00)"
+        required: false
+        type: string
+        default: "60:00"
+      action:
+        description: "Action (login)"
+        required: false
+        type: string
+        default: "login"
 
 jobs:
   login:
@@ -45,6 +55,7 @@ jobs:
           TEST_PASSWORD: ${{ github.event.inputs.password }}
           TEST_PLATFORM: ${{ github.event.inputs.platform }}
           TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex || '0' }}
+          TEST_INITIAL_TIMER: ${{ github.event.inputs.initialTimer || '60:00' }}
           USER_ID: ${{ github.event.inputs.userId }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-test_login_workflow.py – Autologin avec proxy optionnel.
-Priorité Turnstile (ananana.py), fallback IconCaptcha (ravitoto.py).
+test_login_workflow.py – Autologin AVEC proxy
+Priorité Turnstile (ananana.py), fallback IconCaptcha (ravitoto.py)
++ Détection cookies renforcée
 """
 
 import os
@@ -28,25 +29,22 @@ from github import Github, GithubException, Auth
 from camoufox import Camoufox
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
-# Modules de résolution de captcha
-import ananana      # Turnstile  (solve_turnstile, check_turnstile_token)
-import ravitoto     # IconCaptcha (solve_iconcaptcha, move_mouse, click_dot, etc.)
-
+import ananana
+import ravitoto
 
 # ── Variables d'environnement ───────────────────────────────────────────────
-EMAIL             = os.getenv("TEST_EMAIL")
-PASSWORD          = os.getenv("TEST_PASSWORD")
-PLATFORM          = os.getenv("TEST_PLATFORM")
-PROXY_INDEX       = int(os.getenv("TEST_PROXY_INDEX", "0") or "0")
+EMAIL            = os.getenv("TEST_EMAIL")
+PASSWORD         = os.getenv("TEST_PASSWORD")
+PLATFORM         = os.getenv("TEST_PLATFORM")
+PROXY_INDEX      = int(os.getenv("TEST_PROXY_INDEX", "0") or "0")
 INITIAL_TIMER_STR = os.getenv("TEST_INITIAL_TIMER", "60:00")
-GH_TOKEN          = os.getenv("GH_TOKEN")
-GH_USERNAME       = os.getenv("GH_USERNAME")
-GH_REPO           = os.getenv("GH_REPO")
-GH_BRANCH         = os.getenv("GH_BRANCH", "main")
-USER_ID           = os.getenv("USER_ID")
-CRYPTO_SECRET     = os.getenv("CRYPTO_SECRET")
-
-JP_PROXY_LIST = [p.strip() for p in os.getenv("JP_PROXY_LIST", "").split(",") if p.strip()]
+GH_TOKEN         = os.getenv("GH_TOKEN")
+GH_USERNAME      = os.getenv("GH_USERNAME")
+GH_REPO          = os.getenv("GH_REPO")
+GH_BRANCH        = os.getenv("GH_BRANCH", "main")
+USER_ID          = os.getenv("USER_ID")
+CRYPTO_SECRET    = os.getenv("CRYPTO_SECRET")
+JP_PROXY_LIST    = [p.strip() for p in os.getenv("JP_PROXY_LIST", "").split(",") if p.strip()]
 
 if not CRYPTO_SECRET:
     print("❌ CRYPTO_SECRET est obligatoire")
@@ -63,39 +61,12 @@ VIDEOS_DIR = Path(__file__).parent / "videos"
 VIDEOS_DIR.mkdir(exist_ok=True)
 
 
-# ── Utilitaires de délai ────────────────────────────────────────────────────
 def random_sleep(min_ms: int, max_ms: int) -> None:
     time.sleep(random.randint(min_ms, max_ms) / 1000)
 
 
-# ── Proxy ──────────────────────────────────────────────────────────────────
-def parse_proxy_url(proxy_url: str):
-    if not proxy_url:
-        return None
-    proxy_url = proxy_url.strip()
-    if proxy_url.startswith("socks5://") or proxy_url.startswith("socks://"):
-        protocol = "socks5"
-    else:
-        protocol = "http"
-    if "://" in proxy_url:
-        proxy_url = proxy_url.split("://", 1)[1]
-    parts = proxy_url.split("@")
-    if len(parts) == 2:
-        auth, server = parts
-        user, pwd = auth.split(":", 1)
-        host, port = server.split(":")
-        return {"server": f"{protocol}://{host}:{port}", "username": user, "password": pwd}
-    else:
-        host, port = proxy_url.split(":")
-        return {"server": f"{protocol}://{host}:{port}", "username": None, "password": None}
-
-
-# ── Chiffrement / Déchiffrement (AES-256-CBC + scrypt) ─────────────────────
 def derive_key(secret: str, salt: bytes = b"salt") -> bytes:
-    kdf = Scrypt(
-        salt=salt, length=32, n=2**14, r=8, p=1,
-        backend=default_backend()
-    )
+    kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1, backend=default_backend())
     return kdf.derive(secret.encode())
 
 
@@ -133,102 +104,110 @@ def time_str_to_minutes(s: str) -> float:
     return mins + secs / 60.0
 
 
-# ── Capture vidéo ───────────────────────────────────────────────────────────
+def parse_proxy_url(proxy_url: str) -> Optional[Dict[str, str]]:
+    if not proxy_url:
+        return None
+    proxy_url = proxy_url.strip()
+    if proxy_url.startswith("socks5://") or proxy_url.startswith("socks://"):
+        protocol = "socks5"
+    else:
+        protocol = "http"
+    if "://" in proxy_url:
+        proxy_url = proxy_url.split("://", 1)[1]
+    parts = proxy_url.split("@")
+    if len(parts) == 2:
+        auth, server = parts
+        user, pwd = auth.split(":", 1)
+        host, port = server.split(":")
+        return {
+            "server": f"{protocol}://{host}:{port}",
+            "username": user,
+            "password": pwd,
+        }
+    else:
+        host, port = proxy_url.split(":")
+        return {"server": f"{protocol}://{host}:{port}", "username": None, "password": None}
+
+
 def start_ffmpeg(video_path: str):
     display = os.environ.get("DISPLAY", ":99")
     args = [
-        "ffmpeg",
-        "-f", "x11grab",
-        "-video_size", "1280x720",
-        "-i", display,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "0",
-        "-pix_fmt", "yuv420p",
-        "-y", video_path,
+        "ffmpeg", "-f", "x11grab", "-video_size", "1280x720",
+        "-i", display, "-c:v", "libx264", "-preset", "ultrafast",
+        "-crf", "28", "-pix_fmt", "yuv420p", "-y", video_path,
     ]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    print(f"🎥 FFmpeg démarré sur {display}, vidéo → {video_path}")
+    print(f"🎥 FFmpeg démarré → {video_path}")
     return proc
 
 
 def stop_ffmpeg(proc):
     if proc is None:
         return
-    proc.terminate()
     try:
+        proc.terminate()
         proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
     print("🎥 FFmpeg arrêté")
 
 
-# ── Remplissage via JavaScript (bypass visibilité Playwright) ──────────────
 def human_fill(page, selector: str, value: str, field_name: str) -> None:
     print(f"⌨️  Remplissage de {field_name}...")
-    # Passer la valeur via un argument JS pour éviter les injections
-    # et ne jamais l'afficher dans les logs
-    filled = page.evaluate(
-        """([selectors, value]) => {
-            const list = selectors.split(',').map(s => s.trim());
-            for (const sel of list) {
-                const el = document.querySelector(sel);
-                if (el) {
-                    el.focus();
-                    el.value = value;
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    return sel;
-                }
-            }
-            return null;
-        }""",
-        [selector, value]
-    )
-    if not filled:
-        raise RuntimeError(f"❌ Aucun champ trouvé pour : {field_name}")
-    print(f"   → sélecteur utilisé : {filled}")
+    page.fill(selector, value)
     time.sleep(random.uniform(0.5, 1.5))
 
 
 def scroll_to_element(page, selector: str) -> None:
     try:
         element = page.wait_for_selector(selector, timeout=5000)
-        page.evaluate(
-            "(el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' })",
-            element
-        )
+        page.evaluate("(el) => el.scrollIntoView({ behavior: 'smooth', block: 'center' })", element)
         time.sleep(random.uniform(1.0, 2.0))
     except Exception:
         pass
 
 
 def verify_login_success(page) -> bool:
+    """Détection stricte de connexion réussie"""
     try:
+        url = page.url.lower()
+        
+        # Si on est clairement sur une page de login
+        if any(x in url for x in ["login", "signin", "auth"]):
+            pwd = page.query_selector('input[type="password"]')
+            if pwd:
+                box = pwd.bounding_box()
+                if box and box["width"] > 10:
+                    return False
+
+        # Message d'erreur visible
         error_text = page.evaluate("""() => {
-            const alert = document.querySelector('#signupAlert');
-            if (alert && alert.style.display !== 'none' && alert.textContent.trim().length > 0)
-                return alert.textContent.trim();
-            const danger = document.querySelector('.alert-danger:not([style*="display: none"])');
-            if (danger && danger.textContent.trim().length > 0)
-                return danger.textContent.trim();
-            const error = document.querySelector('.error:not([style*="display: none"])');
-            if (error && error.textContent.trim().length > 0)
-                return error.textContent.trim();
+            const selectors = ['#signupAlert', '.alert-danger', '.error', '[class*="error"]'];
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                if (el && el.offsetParent !== null && el.textContent.trim().length > 0)
+                    return el.textContent.trim();
+            }
             return '';
         }""")
         if error_text:
             print(f"⚠️ Message d'erreur détecté : {error_text}")
             return False
+
+        # Vérification des cookies (très important)
+        cookies = page.context.cookies()
+        if len(cookies) == 0:
+            print("⚠️ Aucun cookie trouvé → considéré comme non connecté")
+            return False
+
+        return True
     except Exception:
-        pass
-
-    if 'login.php' in page.url:
         return False
-    return True
 
 
-# ── Sauvegarde GitHub ───────────────────────────────────────────────────────
 def get_github_client():
     return Github(auth=Auth.Token(GH_TOKEN))
 
@@ -311,20 +290,9 @@ def update_global_accounts(new_entry: dict) -> None:
 
             content = json.dumps(current, indent=2)
             if sha:
-                repo.update_file(
-                    GLOBAL_FILE,
-                    f"Mise à jour de {new_entry['email']}",
-                    content,
-                    sha,
-                    branch=GH_BRANCH,
-                )
+                repo.update_file(GLOBAL_FILE, f"Mise à jour de {new_entry['email']}", content, sha, branch=GH_BRANCH)
             else:
-                repo.create_file(
-                    GLOBAL_FILE,
-                    f"Création de {new_entry['email']}",
-                    content,
-                    branch=GH_BRANCH,
-                )
+                repo.create_file(GLOBAL_FILE, f"Création de {new_entry['email']}", content, branch=GH_BRANCH)
             return
 
         except GithubException as e:
@@ -335,100 +303,80 @@ def update_global_accounts(new_entry: dict) -> None:
                 raise
 
 
-# ── Page de login ───────────────────────────────────────────────────────────
 def login_page_action(page, email: str, password: str, platform: str) -> bool:
 
     if verify_login_success(page):
         print("✅ Déjà connecté via cookie persistant")
         return True
 
+    # Remplissage des champs
     email_selector = (
         '#user_email, '
         'input[name="user_email"], '
         'input[type="email"], '
-        'input[name="email"], '
-        'input[autocomplete="email"]'
+        'input[name="email"]'
     )
     password_selector = (
-        '#password, '
+        'input[type="password"], '
         'input[name="password"], '
-        'input[type="password"]'
+        '#password'
     )
-
-    # ── Attendre que le DOM soit prêt (au moins un champ présent) ─────────
-    print("⏳ Attente du champ email...")
-    try:
-        page.wait_for_function(
-            """() => {
-                const sels = ['#user_email','input[name="user_email"]',
-                              'input[type="email"]','input[name="email"]',
-                              'input[autocomplete="email"]'];
-                return sels.some(s => document.querySelector(s) !== null);
-            }""",
-            timeout=30000
-        )
-    except PlaywrightTimeout:
-        raise RuntimeError(f"❌ Champ email introuvable sur {platform} ({page.url})")
-
     human_fill(page, email_selector, email, 'email')
-
-    # Pause après email pour laisser le site réagir
-    time.sleep(1.5)
-
-    print("⏳ Attente du champ password...")
-    try:
-        page.wait_for_function(
-            """() => {
-                const sels = ['#password','input[name="password"]','input[type="password"]'];
-                return sels.some(s => document.querySelector(s) !== null);
-            }""",
-            timeout=10000
-        )
-    except PlaywrightTimeout:
-        raise RuntimeError(f"❌ Champ password introuvable sur {platform} ({page.url})")
-
-    # Scroll vers le champ password avant de remplir
-    try:
-        page.evaluate("""() => {
-            const el = document.querySelector('#password, input[name="password"], input[type="password"]');
-            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }""")
-        time.sleep(0.5)
-    except Exception:
-        pass
-
     human_fill(page, password_selector, password, 'password')
 
-    # Vérifier que le password a bien été rempli
-    filled_ok = page.evaluate("""() => {
-        const el = document.querySelector('#password, input[name="password"], input[type="password"]');
-        return el ? el.value.length > 0 : false;
-    }""")
-    if not filled_ok:
-        print("⚠️ Password non rempli, 2ème tentative...")
-        page.evaluate(
-            """(pwd) => {
-                const el = document.querySelector('#password, input[name="password"], input[type="password"]');
-                if (el) {
-                    el.focus();
-                    el.value = pwd;
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                    el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-                }
-            }""",
-            password
-        )
-        time.sleep(0.5)
-    print("✅ Password rempli")
-
     select_sel = "#captcha_provider, select"
-    page.wait_for_selector(select_sel, timeout=10000)
-    options = page.eval_on_selector_all(
-        f"{select_sel} option",
-        "opts => opts.map(o => ({ text: o.textContent.trim(), value: o.value }))"
-    )
+    try:
+        page.wait_for_selector(select_sel, timeout=10000)
+        options = page.eval_on_selector_all(
+            f"{select_sel} option",
+            "opts => opts.map(o => ({ text: o.textContent.trim(), value: o.value }))"
+        )
+    except:
+        options = []
 
+    scroll_to_element(page, '#process_login, button:has-text("Log in"), button:has-text("LOGIN"), button:has-text("Login"), button[type="submit"]')
+
+    captcha_solved = False
+
+    # Priorité Turnstile
+    turnstile_opt = next((o for o in options if "Turnstile" in o.get("text", "")), None)
+    if turnstile_opt:
+        print("🔍 Priorité Turnstile...")
+        page.select_option(select_sel, turnstile_opt["value"])
+        time.sleep(2)
+
+        if ananana.solve_turnstile(page, timeout=30):
+            print("✅ Turnstile résolu")
+            captcha_solved = True
+        else:
+            print("⚠️ Turnstile non résolu, bascule sur IconCaptcha...")
+
+    # Fallback IconCaptcha
+    icon_opt = next((o for o in options if o["text"] == "IconCaptcha"), None)
+    if not captcha_solved and icon_opt:
+        print("🔍 Tentative IconCaptcha...")
+        page.select_option(select_sel, icon_opt["value"])
+        time.sleep(1)
+
+        login_btn = page.wait_for_selector('#process_login, button:has-text("Log in"), button:has-text("LOGIN")', timeout=5000)
+        box = login_btn.bounding_box()
+        if not box:
+            raise RuntimeError("Bouton Log in introuvable pour IconCaptcha")
+        login_coords = {
+            'x': box['x'] + box['width'] / 2,
+            'y': box['y'] + box['height'] / 2,
+        }
+
+        if ravitoto.solve_iconcaptcha(page, login_coords, max_attempts=3):
+            print("✅ IconCaptcha résolu")
+            captcha_solved = True
+        else:
+            print("❌ Échec IconCaptcha")
+
+    if not captcha_solved and options:
+        raise RuntimeError("❌ Aucun captcha résolu")
+
+    # Clic sur Log in
     login_btn_sel = (
         '#process_login, '
         'button:has-text("Log in"), '
@@ -438,56 +386,8 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
         'input[type="submit"]'
     )
     scroll_to_element(page, login_btn_sel)
-
-    turnstile_opt = next(
-        (o for o in options if "Turnstile" in o["text"]), None
-    )
-    icon_opt = next(
-        (o for o in options if o["text"] == "IconCaptcha"), None
-    )
-
-    captcha_solved = False
-
-    if turnstile_opt:
-        print("🔍 Priorité Turnstile...")
-        page.select_option(select_sel, turnstile_opt["value"])
-        time.sleep(2)
-        if ananana.solve_turnstile(page, timeout=30):
-            print("✅ Turnstile résolu")
-            captcha_solved = True
-        else:
-            print("⚠️ Turnstile non résolu, bascule sur IconCaptcha...")
-
-    if not captcha_solved and icon_opt:
-        print("🔍 Tentative IconCaptcha...")
-        page.select_option(select_sel, icon_opt["value"])
-        time.sleep(1)
-        login_btn = page.wait_for_selector(login_btn_sel, timeout=5000)
-        box = login_btn.bounding_box()
-        if not box:
-            raise RuntimeError("Bouton Login introuvable pour IconCaptcha")
-        login_coords = {
-            'x': box['x'] + box['width'] / 2,
-            'y': box['y'] + box['height'] / 2,
-        }
-        if ravitoto.solve_iconcaptcha(page, login_coords, max_attempts=3):
-            print("✅ IconCaptcha résolu")
-            captcha_solved = True
-        else:
-            print("❌ Échec IconCaptcha")
-
-    if not captcha_solved:
-        raise RuntimeError("❌ Aucun captcha résolu")
-
-    print("🖱️ Clic sur LOGIN...")
-    page.wait_for_function(
-        """() => {
-            const sels = ['#process_login','button[type="submit"]','input[type="submit"]'];
-            return sels.some(s => document.querySelector(s) !== null);
-        }""",
-        timeout=10000
-    )
-    page.click(login_btn_sel)
+    login_btn = page.wait_for_selector(login_btn_sel, timeout=8000)
+    login_btn.click()
 
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
@@ -497,10 +397,8 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
 
     if not verify_login_success(page):
         error = page.evaluate("""() => {
-            const alert = document.querySelector('#signupAlert');
-            if (alert && alert.textContent.trim()) return alert.textContent.trim();
-            const danger = document.querySelector('.alert-danger');
-            return danger ? danger.textContent.trim() : 'Aucun message d\\'erreur trouvé';
+            const alert = document.querySelector('#signupAlert, .alert-danger');
+            return alert ? alert.textContent.trim() : 'Aucun message d\\'erreur trouvé';
         }""")
         raise RuntimeError(f"Échec de connexion : {error}")
 
@@ -508,31 +406,26 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
     return True
 
 
-# ── Main ────────────────────────────────────────────────────────────────────
 def main():
     normalized_email = EMAIL.strip().lower()
-    # Masquer le mot de passe des logs dès le départ
-    if PASSWORD:
-        print(f"ℹ️  Compte : {normalized_email} | Plateforme : {PLATFORM}")
     video_path  = VIDEOS_DIR / f"login_{normalized_email.replace('@', '_').replace('.', '_')}.mp4"
     ffmpeg_proc = None
 
     try:
-        # ── Résolution du proxy ───────────────────────────────────────────────
+        # Gestion du proxy
         proxy_dict = None
         if JP_PROXY_LIST:
             proxy_url = JP_PROXY_LIST[PROXY_INDEX] if PROXY_INDEX < len(JP_PROXY_LIST) else JP_PROXY_LIST[0]
             proxy_dict = parse_proxy_url(proxy_url)
-            print(f"ℹ️  Connexion via proxy index {PROXY_INDEX}")
+            print(f"🌐 Utilisation du proxy index {PROXY_INDEX}")
         else:
-            print("ℹ️  Connexion directe (sans proxy)")
+            print("ℹ️  Aucun proxy configuré")
 
         ffmpeg_proc = start_ffmpeg(str(video_path))
         time.sleep(1)
 
         login_urls = {
             "tronpick": "https://tronpick.io/login.php",
-            "1xbet":    "https://1x-bet.mobi/fr/virtualsports",
             "litepick": "https://litepick.io/login.php",
             "dogepick": "https://dogepick.io/login.php",
             "solpick":  "https://solpick.io/login.php",
@@ -544,13 +437,15 @@ def main():
             "freetron": "https://freetron.in/login",
         }
         login_url = login_urls.get(PLATFORM, f"https://{PLATFORM}.io/login.php")
-        print(f"🌐 URL cible : {login_url}")
 
-        camoufox_kwargs = dict(headless=False, humanize=True, geoip=True)
-        if proxy_dict:
-            camoufox_kwargs["proxy"] = proxy_dict
+        print(f"🌐 Navigation vers {login_url}...")
 
-        with Camoufox(**camoufox_kwargs) as browser:
+        with Camoufox(
+            headless=False,
+            humanize=True,
+            geoip=True,
+            proxy=proxy_dict
+        ) as browser:
             page = browser.new_page()
             page.goto(login_url, wait_until="networkidle", timeout=60000)
 
@@ -561,47 +456,47 @@ def main():
             cookies = page.context.cookies()
             print(f"🍪 Cookies récupérés : {len(cookies)}")
 
+            # Sécurité critique
+            if len(cookies) == 0:
+                print("❌ Aucun cookie récupéré → échec")
+                raise RuntimeError("Aucun cookie récupéré après login")
+
             # Lecture du solde
             initial_balance = 0.0
             try:
-                balance_el   = page.wait_for_selector('[class*="balance"]', timeout=5000)
+                balance_el = page.wait_for_selector('[class*="balance"]', timeout=5000)
                 balance_text = balance_el.inner_text()
                 initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
             except Exception:
                 try:
-                    page.goto(
-                        f"https://{PLATFORM}.io/faucet.php",
-                        wait_until="networkidle",
-                        timeout=30000
-                    )
+                    page.goto(f"https://{PLATFORM}.io/faucet.php" if PLATFORM != "freetron" else "https://freetron.in/faucet",
+                              wait_until="networkidle", timeout=30000)
                     time.sleep(5)
                     balance_el = page.query_selector('[class*="balance"]')
                     if balance_el:
                         balance_text = balance_el.inner_text()
-                        initial_balance = float(
-                            "".join(c for c in balance_text if c.isdigit() or c == ".")
-                        )
+                        initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
                 except Exception as e:
                     print(f"⚠️ Impossible de lire le solde : {e}")
 
         stop_ffmpeg(ffmpeg_proc)
         ffmpeg_proc = None
 
-        # ── Sauvegarde GitHub ─────────────────────────────────────────────
-        g    = get_github_client()
+        # Sauvegarde
+        g = get_github_client()
         repo = g.get_repo(f"{GH_USERNAME}/{GH_REPO}")
 
         existing_account = None
         try:
             if USER_ID:
-                content          = repo.get_contents(USER_FILE, ref=GH_BRANCH)
+                content = repo.get_contents(USER_FILE, ref=GH_BRANCH)
                 existing_account = json.loads(base64.b64decode(content.content).decode())
         except Exception:
             pass
 
-        created_at            = existing_account.get("createdAt")                    if existing_account else int(time.time() * 1000)
+        created_at = existing_account.get("createdAt") if existing_account else int(time.time() * 1000)
         saved_initial_balance = existing_account.get("initialBalance", initial_balance) if existing_account else initial_balance
-        saved_total_claims    = existing_account.get("totalClaims", 0)               if existing_account else 0
+        saved_total_claims = existing_account.get("totalClaims", 0) if existing_account else 0
 
         timer_value = time_str_to_minutes(INITIAL_TIMER_STR)
         account = {

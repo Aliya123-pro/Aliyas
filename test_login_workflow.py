@@ -495,7 +495,7 @@ def main():
 
         login_urls = {
             "tronpick": "https://tronpick.io/login.php",
-            "tronlux":  "https://freetron.in/login",
+            "freetron":  "https://freetron.in/login",
             "litepick": "https://litepick.io/login.php",
             "dogepick": "https://dogepick.io/login.php",
             "solpick":  "https://solpick.io/login.php",

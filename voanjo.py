@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
-Version finale : capture vidéo systématique + détection bouton robuste
+Version finale : capture vidéo + détection robuste + inspection boutons
 """
 
 import os, sys, json, time, random, base64, subprocess
@@ -251,7 +251,6 @@ def claim_with_cookies(account: dict):
     if not proxy_dict:
         raise ValueError("Proxy invalide")
 
-    # Nom de la vidéo (unique)
     safe_email = CLAIM_EMAIL.replace("@", "_").replace(".", "_")
     video_path = str(VIDEOS_DIR / f"claim_{CLAIM_PLATFORM}_{safe_email}_{int(time.time())}.mp4")
     ffmpeg_proc = None
@@ -311,6 +310,7 @@ def claim_with_cookies(account: dict):
                     "[onclick*='claim']",
                     "button.btn-primary",
                     "input[type='submit'][value*='Claim']",
+                    "button[type='submit']",
                 ]
 
                 claim_btn = None
@@ -340,9 +340,47 @@ def claim_with_cookies(account: dict):
                     except Exception:
                         continue
 
-                # Aucun bouton cliquable → on lit le timer (comportement freetron)
+                # ─────────────── Aucun bouton trouvé → Inspection complète ───────────────
                 if not claim_btn:
-                    print("⏳ Aucun bouton Claim cliquable trouvé → lecture du timer...")
+                    print("⏳ Aucun bouton Claim cliquable trouvé → Inspection de tous les boutons...")
+
+                    try:
+                        buttons_info = page.evaluate("""() => {
+                            const buttons = Array.from(document.querySelectorAll(
+                                'button, input[type="submit"], input[type="button"], a.btn, .btn, [role="button"]'
+                            ));
+                            return buttons.map(btn => {
+                                const rect = btn.getBoundingClientRect();
+                                const style = window.getComputedStyle(btn);
+                                return {
+                                    tag: btn.tagName,
+                                    id: btn.id || null,
+                                    class: btn.className || null,
+                                    text: (btn.innerText || btn.value || btn.getAttribute('aria-label') || '').trim().substring(0, 80),
+                                    disabled: btn.disabled || btn.getAttribute('disabled') !== null,
+                                    visible: !!(rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'),
+                                    width: Math.round(rect.width),
+                                    height: Math.round(rect.height),
+                                    x: Math.round(rect.x),
+                                    y: Math.round(rect.y)
+                                };
+                            });
+                        }""")
+
+                        print(f"🔍 {len(buttons_info)} éléments de type bouton trouvés sur la page :")
+                        for i, b in enumerate(buttons_info, 1):
+                            status = []
+                            if b["disabled"]:
+                                status.append("DISABLED")
+                            if not b["visible"]:
+                                status.append("HIDDEN")
+                            status_str = f" [{', '.join(status)}]" if status else ""
+                            print(f"  {i:2d}. <{b['tag']}> id={b['id']} class=\"{b['class']}\" "
+                                  f"text=\"{b['text']}\" size={b['width']}x{b['height']} pos=({b['x']},{b['y']}){status_str}")
+                    except Exception as e:
+                        print(f"⚠️ Impossible d'inspecter les boutons : {e}")
+
+                    # Lecture du timer
                     minutes_left = extract_timer(page)
                     if minutes_left is not None and minutes_left < 60:
                         minutes_left = 60

@@ -3,7 +3,7 @@
 Bot de login avec Camoufox (Firefox furtif).
 Résolution Turnstile automatique – détection du succès par absence d'erreur
 et absence de 'login.php' dans l'URL après connexion.
-Version corrigée pour gérer les chargements dynamiques (freetron).
+Version corrigée pour freetron avec attente plus robuste.
 """
 
 import os, sys, json, time, random, subprocess, base64
@@ -229,7 +229,7 @@ def scroll_to_element(page, selector):
     except:
         pass
 
-# --- Sélecteurs par plateforme (ajustez si nécessaire) ---
+# --- Sélecteurs par plateforme ---
 SELECTORS = {
     'default': {
         'email': 'input[type="email"], input[name="email"]',
@@ -237,8 +237,9 @@ SELECTORS = {
         'login_button': 'button:has-text("Log in")',
     },
     'freetron': {
-        'email': 'input[type="email"][name="email"]',
-        'password': 'input[type="password"][name="password"]',
+        # Utilisation de sélecteurs simples et robustes
+        'email': 'input[type="email"]',
+        'password': 'input[type="password"]',
         'login_button': 'button[type="submit"]:has-text("Log in")',
     },
     # Ajoutez d'autres plateformes si nécessaire
@@ -257,12 +258,18 @@ def login_page_action(page, email: str, password: str, platform: str):
     password_selector = selectors['password']
     login_button_selector = selectors['login_button']
 
-    # Attendre explicitement que le champ email soit visible (timeout 30s)
+    # Attendre explicitement que le champ email soit présent dans le DOM (pas nécessairement visible)
     print("⏳ Attente du champ email...")
     try:
-        page.wait_for_selector(email_selector, state="visible", timeout=30000)
+        # Utiliser state="attached" pour attendre la présence dans le DOM
+        page.wait_for_selector(email_selector, state="attached", timeout=30000)
+        # Petit délai pour laisser le champ devenir interactif
+        time.sleep(1)
     except Exception as e:
-        print(f"❌ Champ email introuvable : {e}")
+        print(f"❌ Champ email introuvable dans le DOM : {e}")
+        # Tentative de diagnostic : afficher le HTML de la page
+        html = page.content()
+        print("HTML partiel :", html[:2000])
         raise
 
     human_fill(page, email_selector, email, 'email')
@@ -444,10 +451,10 @@ def main():
             page = browser.new_page()
             page.goto(login_url, wait_until="networkidle", timeout=60000)
 
-            # Attente supplémentaire pour les plateformes à chargement dynamique
+            # Attente supplémentaire plus longue pour freetron
             if PLATFORM == 'freetron':
-                print("⏳ Attente supplémentaire pour freetron (5s)...")
-                time.sleep(5)
+                print("⏳ Attente supplémentaire pour freetron (10s)...")
+                time.sleep(10)
 
             success = login_page_action(page, normalized_email, PASSWORD, PLATFORM)
             if not success:

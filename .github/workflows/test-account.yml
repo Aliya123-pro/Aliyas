@@ -65,3 +65,10 @@ jobs:
           JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
           CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
         run: xvfb-run --auto-servernum python test_login_workflow.py
+
+      - name: Upload video artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: login-video-${{ github.run_id }}
+          path: /app/videos/*.mp4
+          if-no-files-found: warn

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
-Version corrigée avec résolution Turnstile intelligente (ananana.solve_turnstile)
+Version avec capture vidéo + meilleure détection du bouton Claim
 """
 
-import os, sys, json, time, random, base64
+import os, sys, json, time, random, base64, subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import Optional, Dict, Any
@@ -38,7 +38,11 @@ if not all([CRYPTO_SECRET, USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, JP_PROXY_LIST])
 
 USER_FILE = f"account_{USER_ID}_{CLAIM_PLATFORM}_{CLAIM_EMAIL}.json"
 
-# --- Chiffrement (identique au bot login) ---
+# Dossier vidéos
+VIDEOS_DIR = Path(__file__).parent / "videos"
+VIDEOS_DIR.mkdir(exist_ok=True)
+
+# --- Chiffrement ---
 def derive_key(secret: str, salt: bytes = b"salt") -> bytes:
     kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1, backend=default_backend())
     return kdf.derive(secret.encode())
@@ -97,6 +101,34 @@ def parse_proxy_url(proxy_url: str) -> Optional[Dict[str, str]]:
     else:
         host, port = proxy_url.split(":")
         return {"server": f"{protocol}://{host}:{port}", "username": None, "password": None}
+
+# --- Capture vidéo ---
+def start_ffmpeg(video_path: str):
+    display = os.environ.get("DISPLAY", ":99")
+    args = [
+        "ffmpeg",
+        "-f", "x11grab",
+        "-video_size", "1280x720",
+        "-i", display,
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-crf", "28",
+        "-pix_fmt", "yuv420p",
+        "-y", video_path,
+    ]
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(f"🎥 FFmpeg démarré → {video_path}")
+    return proc
+
+def stop_ffmpeg(proc):
+    if proc is None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+    print("🎥 FFmpeg arrêté")
 
 def get_github_client():
     return Github(auth=Auth.Token(GH_TOKEN))
@@ -216,10 +248,19 @@ def claim_with_cookies(account: dict):
     if not proxy_dict:
         raise ValueError("Proxy invalide")
 
+    # Nom de la vidéo
+    safe_email = CLAIM_EMAIL.replace("@", "_").replace(".", "_")
+    video_path = str(VIDEOS_DIR / f"claim_{CLAIM_PLATFORM}_{safe_email}_{int(time.time())}.mp4")
+    ffmpeg_proc = None
+
     for attempt in range(1, 4):
-        browser = None
         try:
             print(f"--- Tentative claim {attempt}/3 ---")
+            
+            # Démarrer la capture vidéo à chaque tentative
+            ffmpeg_proc = start_ffmpeg(video_path)
+            time.sleep(1)
+
             with Camoufox(
                 headless=False,
                 humanize=True,
@@ -239,7 +280,7 @@ def claim_with_cookies(account: dict):
                             print(f"🍪 {len(valid_cookies)} cookies injectés")
 
                 page.goto(faucet_url, wait_until="networkidle", timeout=90000)
-                time.sleep(20)
+                time.sleep(15)
 
                 if "login.php" in page.url:
                     print("❌ Cookies expirés")
@@ -248,13 +289,33 @@ def claim_with_cookies(account: dict):
                     account["timer"] = 120
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
+                    stop_ffmpeg(ffmpeg_proc)
                     return {"success": False, "message": "Cookies expirés"}
 
                 print("✅ Session valide")
                 account["cookiesStatus"] = "valid"
 
-                claim_btn_selector = "#process_claim_hourly_faucet"
-                claim_btn = page.query_selector(claim_btn_selector)
+                # ─────────────── Meilleure détection du bouton Claim ───────────────
+                claim_btn_selectors = [
+                    "#process_claim_hourly_faucet",
+                    "button#process_claim_hourly_faucet",
+                    "input#process_claim_hourly_faucet",
+                    "button:has-text('Claim')",
+                    "button:has-text('CLAIM')",
+                    ".btn-claim",
+                    "[onclick*='claim']",
+                ]
+
+                claim_btn = None
+                for sel in claim_btn_selectors:
+                    try:
+                        claim_btn = page.wait_for_selector(sel, timeout=8000, state="visible")
+                        if claim_btn:
+                            print(f"✅ Bouton Claim trouvé avec le sélecteur : {sel}")
+                            break
+                    except:
+                        continue
+
                 if not claim_btn:
                     print("⏳ Bouton Claim absent, lecture du timer...")
                     minutes_left = extract_timer(page)
@@ -266,32 +327,28 @@ def claim_with_cookies(account: dict):
                     account["lastClaim"] = int(time.time() * 1000)
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
+                    stop_ffmpeg(ffmpeg_proc)
                     return {"success": False, "message": f"Claim déjà fait, dispo dans {wait_time:.1f} min"}
 
-                # Scroll et affichage du bouton
-                page.evaluate("""(sel) => {
-                    const btn = document.querySelector(sel);
-                    if (btn) {
-                        btn.style.display = 'inline-block';
-                        btn.style.visibility = 'visible';
-                        btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }""", claim_btn_selector)
-                time.sleep(3)
+                # Scroll vers le bouton
+                page.evaluate("""(el) => {
+                    el.style.display = 'inline-block';
+                    el.style.visibility = 'visible';
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }""", claim_btn)
+                time.sleep(2)
 
                 box = claim_btn.bounding_box()
                 if not box or box["width"] == 0:
-                    raise RuntimeError("Impossible de localiser le bouton Claim")
+                    raise RuntimeError("Impossible de localiser le bouton Claim (bounding box vide)")
+                
                 claim_x = box["x"] + box["width"] / 2
                 claim_y = box["y"] + box["height"] / 2
                 print(f"📍 Bouton Claim visible à ({claim_x:.0f}, {claim_y:.0f})")
 
-                # ────────────────────────────────────────────────
-                # ✅ NOUVELLE MÉTHODE TURNSTILE (ananana.solve_turnstile)
-                # ────────────────────────────────────────────────
+                # ─────────────── Résolution Turnstile ───────────────
                 print("🔍 Résolution Turnstile intelligente...")
 
-                # Sélection de l'option Turnstile si un <select> existe
                 select = page.query_selector("select")
                 if select:
                     options = page.eval_on_selector_all(
@@ -301,10 +358,9 @@ def claim_with_cookies(account: dict):
                     turnstile_opt = next((o for o in options if "Turnstile" in o.get("text", "")), None)
                     if turnstile_opt:
                         page.select_option("select", turnstile_opt["value"])
-                        print("🔁 Turnstile sélectionné dans le select")
+                        print("🔁 Turnstile sélectionné")
                         time.sleep(2)
 
-                # Résolution propre via ananana (détection iframe + clic précis)
                 token_found = ananana.solve_turnstile(page, timeout=35)
 
                 if not token_found:
@@ -313,17 +369,18 @@ def claim_with_cookies(account: dict):
                     account["timer"] = 2
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
+                    stop_ffmpeg(ffmpeg_proc)
                     return {"success": False, "message": "Échec Turnstile"}
 
-                print("✅ Turnstile résolu avec succès")
+                print("✅ Turnstile résolu")
                 time.sleep(2)
 
-                # Clic final sur le bouton Claim
+                # Clic sur Claim
                 print("🖱️ Clic sur le bouton Claim")
                 ananana.move_mouse_to(page, claim_x, claim_y)
                 page.mouse.click(claim_x, claim_y)
 
-                # Attendre le résultat
+                # Attente résultat
                 try:
                     page.wait_for_function("""
                         () => {
@@ -387,12 +444,20 @@ def claim_with_cookies(account: dict):
                 account["lastClaim"] = int(time.time() * 1000)
                 save_account(account)
                 add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, balance)
+
+                stop_ffmpeg(ffmpeg_proc)
+                print(f"🎥 Vidéo sauvegardée : {video_path}")
                 return {"success": success, "message": result_message or ("Claim OK" if success else "Échec")}
 
         except Exception as e:
             print(f"❌ Erreur tentative {attempt}: {e}")
+            stop_ffmpeg(ffmpeg_proc)
+            if "NS_ERROR_PROXY_FORBIDDEN" in str(e) or "PROXY" in str(e).upper():
+                print("⚠️ Problème de proxy détecté")
             if attempt == 3:
                 raise
+            time.sleep(3)
+
     raise RuntimeError("Échec du claim après plusieurs tentatives")
 
 def main():

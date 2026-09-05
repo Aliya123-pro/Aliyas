@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
-Version corrigée (claim_result défini, imports ajustés)
+Version corrigée avec résolution Turnstile intelligente (ananana.solve_turnstile)
 """
 
 import os, sys, json, time, random, base64
@@ -227,6 +227,7 @@ def claim_with_cookies(account: dict):
                 proxy=proxy_dict,
             ) as browser:
                 page = browser.new_page()
+
                 # Injection des cookies
                 cookies_data = account.get("cookies")
                 if cookies_data:
@@ -285,49 +286,44 @@ def claim_with_cookies(account: dict):
                 claim_y = box["y"] + box["height"] / 2
                 print(f"📍 Bouton Claim visible à ({claim_x:.0f}, {claim_y:.0f})")
 
-                # Résolution Turnstile (3 essais)
-                token_found = False
-                for retry in range(1, 4):
-                    select = page.query_selector("select")
-                    if select:
-                        options = page.eval_on_selector_all("select option", "opts => opts.map(o => ({text: o.textContent.trim(), value: o.value}))")
-                        turnstile_opt = next((o for o in options if o["text"] == "Cloudflare Turnstile"), None)
-                        if turnstile_opt:
-                            page.select_option("select", turnstile_opt["value"])
-                            print("🔁 Turnstile resélectionné")
-                            time.sleep(2)
-                    click_x = claim_x
-                    click_y = claim_y - 70
-                    print(f"🖱️ Clic Turnstile (tentative {retry}/3) à ({click_x:.0f}, {click_y:.0f})")
-                    ananana.move_mouse_to(page, click_x, click_y)
-                    page.mouse.click(click_x, click_y)
-                    time.sleep(3)
-                    start = time.time()
-                    while time.time() - start < 30:
-                        if ananana.check_turnstile_token(page):
-                            print("✅ Token Turnstile détecté")
-                            time.sleep(2)
-                            token_found = True
-                            break
+                # ────────────────────────────────────────────────
+                # ✅ NOUVELLE MÉTHODE TURNSTILE (ananana.solve_turnstile)
+                # ────────────────────────────────────────────────
+                print("🔍 Résolution Turnstile intelligente...")
+
+                # Sélection de l'option Turnstile si un <select> existe
+                select = page.query_selector("select")
+                if select:
+                    options = page.eval_on_selector_all(
+                        "select option",
+                        "opts => opts.map(o => ({text: o.textContent.trim(), value: o.value}))"
+                    )
+                    turnstile_opt = next((o for o in options if "Turnstile" in o.get("text", "")), None)
+                    if turnstile_opt:
+                        page.select_option("select", turnstile_opt["value"])
+                        print("🔁 Turnstile sélectionné dans le select")
                         time.sleep(2)
-                    if token_found:
-                        break
-                    print(f"⚠️ Token non apparu après tentative {retry}/3")
+
+                # Résolution propre via ananana (détection iframe + clic précis)
+                token_found = ananana.solve_turnstile(page, timeout=35)
 
                 if not token_found:
-                    print("❌ Token Turnstile non résolu après 3 tentatives")
+                    print("❌ Token Turnstile non résolu")
                     account["lastClaim"] = int(time.time() * 1000)
                     account["timer"] = 2
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
                     return {"success": False, "message": "Échec Turnstile"}
 
-                time.sleep(3)
+                print("✅ Turnstile résolu avec succès")
+                time.sleep(2)
+
+                # Clic final sur le bouton Claim
                 print("🖱️ Clic sur le bouton Claim")
                 ananana.move_mouse_to(page, claim_x, claim_y)
                 page.mouse.click(claim_x, claim_y)
 
-                # Attendre le résultat (bouton désactivé ou message)
+                # Attendre le résultat
                 try:
                     page.wait_for_function("""
                         () => {

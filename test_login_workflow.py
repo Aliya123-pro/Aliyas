@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
 test_login_workflow.py – Autologin AVEC proxy
-Priorité Turnstile (ananana.py), fallback IconCaptcha (ravitoto.py)
-+ Détection cookies renforcée
+Priorité Turnstile (ananana.py), fallback IconCaptcha (ravitoto.py - optionnel)
 """
 
 import os
@@ -30,7 +29,15 @@ from camoufox import Camoufox
 from playwright.sync_api import TimeoutError as PlaywrightTimeout
 
 import ananana
-import ravitoto
+
+# ravitoto est optionnel
+try:
+    import ravitoto
+    HAS_RAVITOTO = True
+except ImportError:
+    HAS_RAVITOTO = False
+    print("ℹ️  Module ravitoto non trouvé → IconCaptcha désactivé")
+
 
 # ── Variables d'environnement ───────────────────────────────────────────────
 EMAIL            = os.getenv("TEST_EMAIL")
@@ -174,8 +181,7 @@ def verify_login_success(page) -> bool:
     """Détection stricte de connexion réussie"""
     try:
         url = page.url.lower()
-        
-        # Si on est clairement sur une page de login
+
         if any(x in url for x in ["login", "signin", "auth"]):
             pwd = page.query_selector('input[type="password"]')
             if pwd:
@@ -183,7 +189,6 @@ def verify_login_success(page) -> bool:
                 if box and box["width"] > 10:
                     return False
 
-        # Message d'erreur visible
         error_text = page.evaluate("""() => {
             const selectors = ['#signupAlert', '.alert-danger', '.error', '[class*="error"]'];
             for (const sel of selectors) {
@@ -197,7 +202,6 @@ def verify_login_success(page) -> bool:
             print(f"⚠️ Message d'erreur détecté : {error_text}")
             return False
 
-        # Vérification des cookies (très important)
         cookies = page.context.cookies()
         if len(cookies) == 0:
             print("⚠️ Aucun cookie trouvé → considéré comme non connecté")
@@ -309,7 +313,6 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
         print("✅ Déjà connecté via cookie persistant")
         return True
 
-    # Remplissage des champs
     email_selector = (
         '#user_email, '
         'input[name="user_email"], '
@@ -349,11 +352,11 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
             print("✅ Turnstile résolu")
             captcha_solved = True
         else:
-            print("⚠️ Turnstile non résolu, bascule sur IconCaptcha...")
+            print("⚠️ Turnstile non résolu...")
 
-    # Fallback IconCaptcha
-    icon_opt = next((o for o in options if o["text"] == "IconCaptcha"), None)
-    if not captcha_solved and icon_opt:
+    # Fallback IconCaptcha (seulement si disponible)
+    icon_opt = next((o for o in options if o.get("text") == "IconCaptcha"), None)
+    if not captcha_solved and icon_opt and HAS_RAVITOTO:
         print("🔍 Tentative IconCaptcha...")
         page.select_option(select_sel, icon_opt["value"])
         time.sleep(1)
@@ -372,9 +375,13 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
             captcha_solved = True
         else:
             print("❌ Échec IconCaptcha")
+    elif not captcha_solved and icon_opt and not HAS_RAVITOTO:
+        print("⚠️ IconCaptcha demandé mais module ravitoto absent")
 
     if not captcha_solved and options:
-        raise RuntimeError("❌ Aucun captcha résolu")
+        # Si aucun captcha n'a été résolu mais qu'il y avait des options, on continue quand même
+        # (certains sites n'ont plus de captcha obligatoire)
+        print("⚠️ Aucun captcha résolu, tentative de login quand même...")
 
     # Clic sur Log in
     login_btn_sel = (
@@ -456,7 +463,6 @@ def main():
             cookies = page.context.cookies()
             print(f"🍪 Cookies récupérés : {len(cookies)}")
 
-            # Sécurité critique
             if len(cookies) == 0:
                 print("❌ Aucun cookie récupéré → échec")
                 raise RuntimeError("Aucun cookie récupéré après login")
@@ -469,8 +475,8 @@ def main():
                 initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
             except Exception:
                 try:
-                    page.goto(f"https://{PLATFORM}.io/faucet.php" if PLATFORM != "freetron" else "https://freetron.in/faucet",
-                              wait_until="networkidle", timeout=30000)
+                    faucet_url = "https://freetron.in/faucet" if PLATFORM == "freetron" else f"https://{PLATFORM}.io/faucet.php"
+                    page.goto(faucet_url, wait_until="networkidle", timeout=30000)
                     time.sleep(5)
                     balance_el = page.query_selector('[class*="balance"]')
                     if balance_el:

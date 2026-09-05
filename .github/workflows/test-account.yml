@@ -1,44 +1,34 @@
-name: Test Account Login (Docker)
+name: Login Account
 
 on:
   workflow_dispatch:
     inputs:
       email:
-        description: "Adresse email du compte"
+        description: "Email du compte"
         required: true
         type: string
       password:
-        description: "Mot de passe du compte"
+        description: "Mot de passe"
         required: true
         type: string
       platform:
-        description: "Plateforme (ex: tronpick)"
+        description: "Plateforme (ex: freetron)"
+        required: true
+        type: string
+      userId:
+        description: "USER_ID"
         required: true
         type: string
       proxyIndex:
-        description: "Index du proxy (0 par défaut)"
+        description: "Index du proxy"
         required: false
         type: string
         default: "0"
-      initialTimer:
-        description: "Timer initial (format mm:ss)"
-        required: false
-        type: string
-        default: "60:00"
-      action:
-        description: "Action (login)"
-        required: false
-        type: string
-        default: "login"
-      userId:
-        description: "Identifiant utilisateur (optionnel)"
-        required: false
-        type: string
 
 jobs:
-  test:
+  login:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 6
     container:
       image: ghcr.io/aliya123-pro/camoufox-system:latest
       credentials:
@@ -54,9 +44,7 @@ jobs:
           TEST_EMAIL: ${{ github.event.inputs.email }}
           TEST_PASSWORD: ${{ github.event.inputs.password }}
           TEST_PLATFORM: ${{ github.event.inputs.platform }}
-          TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex }}
-          TEST_INITIAL_TIMER: ${{ github.event.inputs.initialTimer }}
-          TEST_ACTION: ${{ github.event.inputs.action }}
+          TEST_PROXY_INDEX: ${{ github.event.inputs.proxyIndex || '0' }}
           USER_ID: ${{ github.event.inputs.userId }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
@@ -64,11 +52,15 @@ jobs:
           GH_BRANCH: ${{ secrets.GH_BRANCH || 'main' }}
           JP_PROXY_LIST: ${{ secrets.JP_PROXY_LIST }}
           CRYPTO_SECRET: ${{ secrets.CRYPTO_SECRET }}
-        run: xvfb-run --auto-servernum python test_login_workflow.py
+        run: |
+          mkdir -p /app/videos
+          xvfb-run --auto-servernum python test_login_workflow.py
 
-      - name: Upload video artifact
+      - name: Upload des vidéos
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: login-video-${{ github.run_id }}
-          path: /app/videos/*.mp4
+          path: /app/videos/
+          retention-days: 5
           if-no-files-found: warn

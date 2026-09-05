@@ -19,5 +19,12 @@
     "timestamp": 1788600020405,
     "success": true,
     "bonus": 0.289
+  },
+  {
+    "email": "finoanarivoniaina@gmail.com",
+    "platform": "freetron",
+    "timestamp": 1788602202019,
+    "success": false,
+    "bonus": 0
   }
 ]

@@ -3,7 +3,6 @@
 Bot de login avec Camoufox (Firefox furtif).
 Résolution Turnstile automatique – détection du succès par absence d'erreur
 et absence de 'login.php' dans l'URL après connexion.
-Version corrigée pour freetron avec attente plus robuste.
 """
 
 import os, sys, json, time, random, subprocess, base64
@@ -52,11 +51,36 @@ if not JP_PROXY_LIST:
 VIDEOS_DIR = Path(__file__).parent / "videos"
 VIDEOS_DIR.mkdir(exist_ok=True)
 
-# --- Utilitaires ---
+# ---------- Config par plateforme ----------
+# Plateformes React/Next.js (SPA) : nécessitent une attente d'hydratation
+REACT_PLATFORMS = {"tronlux"}
+
+# Sélecteurs spécifiques par plateforme
+PLATFORM_SELECTORS = {
+    # freetron (tronlux) : app React, pas de name sur les inputs, id dynamique
+    "tronlux": {
+        "email":    'input[type="email"]',
+        "password": 'input[type="password"]',
+        "login_btn": 'button[type="submit"]:has-text("Log in")',
+        "error_check": "react",   # mode de vérification d'erreur
+    },
+    # Plateformes classiques (PHP) : login.php, sélecteurs stables
+    "_default": {
+        "email":    'input[type="email"], input[name="email"]',
+        "password": 'input[type="password"]',
+        "login_btn": 'button:has-text("Log in")',
+        "error_check": "php",
+    },
+}
+
+def get_selectors(platform: str) -> dict:
+    return PLATFORM_SELECTORS.get(platform, PLATFORM_SELECTORS["_default"])
+
+# ---------- Utilitaires ----------
 def random_sleep(min_ms: int, max_ms: int) -> None:
     time.sleep(random.randint(min_ms, max_ms) / 1000)
 
-# --- Chiffrement / Déchiffrement ---
+# ---------- Chiffrement / Déchiffrement ----------
 def derive_key(secret: str, salt: bytes = b"salt") -> bytes:
     kdf = Scrypt(salt=salt, length=32, n=2**14, r=8, p=1, backend=default_backend())
     return kdf.derive(secret.encode())
@@ -73,7 +97,7 @@ def encrypt(text: str) -> str:
 
 def decrypt(encrypted_text: str) -> str:
     key = derive_key(CRYPTO_SECRET)
-    parts = encrypted_text.split(":")
+    parts = encrypted_text.split(":", 1)   # FIX: split limité à 1 pour éviter la casse si ":" dans le ciphertext hex
     iv = bytes.fromhex(parts[0])
     encrypted = bytes.fromhex(parts[1])
     cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
@@ -90,7 +114,7 @@ def time_str_to_minutes(s: str) -> float:
     secs = int(parts[1]) if len(parts) > 1 and parts[1] else 0
     return mins + secs / 60.0
 
-# --- Capture vidéo ---
+# ---------- Capture vidéo ----------
 def start_ffmpeg(video_path: str):
     display = os.environ.get("DISPLAY", ":99")
     args = [
@@ -109,7 +133,7 @@ def stop_ffmpeg(proc):
         proc.kill()
     print("🎥 FFmpeg arrêté")
 
-# --- Parsing proxy ---
+# ---------- Parsing proxy ----------
 def parse_proxy_url(proxy_url: str) -> Optional[Dict[str, str]]:
     if not proxy_url:
         return None
@@ -132,7 +156,7 @@ def parse_proxy_url(proxy_url: str) -> Optional[Dict[str, str]]:
         host, port = proxy_url.split(":")
         return {"server": f"{protocol}://{host}:{port}", "username": None, "password": None}
 
-# --- Fonctions d'interaction ---
+# ---------- Fonctions d'interaction ----------
 def human_fill(page, selector, value, field_name):
     print(f"⌨️ Remplissage de {field_name}...")
     page.fill(selector, value)
@@ -192,31 +216,57 @@ def solve_turnstile(page, timeout=30):
         time.sleep(1)
     return False
 
-def verify_login_success(page) -> bool:
+def verify_login_success(page, platform: str = "") -> bool:
+    """
+    Vérifie si le login a réussi.
+    - Plateformes React (tronlux) : pas de login.php, vérification via URL et alertes React
+    - Plateformes PHP classiques : détecte login.php dans l'URL + alertes DOM standards
+    """
+    selectors = get_selectors(platform)
+    error_mode = selectors.get("error_check", "php")
+
     try:
-        error_text = page.evaluate("""() => {
-            const alert = document.querySelector('#signupAlert');
-            if (alert && alert.style.display !== 'none' && alert.textContent.trim().length > 0) {
-                return alert.textContent.trim();
-            }
-            const danger = document.querySelector('.alert-danger:not([style*="display: none"])');
-            if (danger && danger.textContent.trim().length > 0) {
-                return danger.textContent.trim();
-            }
-            const error = document.querySelector('.error:not([style*="display: none"])');
-            if (error && error.textContent.trim().length > 0) {
-                return error.textContent.trim();
-            }
-            return '';
-        }""")
+        if error_mode == "react":
+            # Freetron / React : cherche les messages d'erreur dans les composants React
+            error_text = page.evaluate("""() => {
+                // Alertes génériques
+                const alert = document.querySelector('[role="alert"]');
+                if (alert && alert.textContent.trim().length > 0) return alert.textContent.trim();
+                // Toast d'erreur
+                const toast = document.querySelector('[data-sonner-toast][data-type="error"]');
+                if (toast && toast.textContent.trim().length > 0) return toast.textContent.trim();
+                // Classe d'erreur générique
+                const err = document.querySelector('.text-destructive, .text-red-500, .error-message');
+                if (err && err.textContent.trim().length > 0) return err.textContent.trim();
+                return '';
+            }""")
+        else:
+            # Plateformes PHP classiques
+            error_text = page.evaluate("""() => {
+                const alert = document.querySelector('#signupAlert');
+                if (alert && alert.style.display !== 'none' && alert.textContent.trim().length > 0)
+                    return alert.textContent.trim();
+                const danger = document.querySelector('.alert-danger:not([style*="display: none"])');
+                if (danger && danger.textContent.trim().length > 0) return danger.textContent.trim();
+                const error = document.querySelector('.error:not([style*="display: none"])');
+                if (error && error.textContent.trim().length > 0) return error.textContent.trim();
+                return '';
+            }""")
+
         if error_text:
             print(f"⚠️ Message d'erreur détecté : {error_text}")
             return False
     except:
         pass
 
-    if 'login.php' in page.url:
+    # Vérification URL : plateformes PHP restent sur login.php en cas d'échec
+    if error_mode == "php" and 'login.php' in page.url:
         return False
+
+    # Plateformes React : restent sur /login en cas d'échec
+    if error_mode == "react" and page.url.rstrip("/").endswith("/login"):
+        return False
+
     return True
 
 def scroll_to_element(page, selector):
@@ -229,66 +279,67 @@ def scroll_to_element(page, selector):
     except:
         pass
 
-# --- Sélecteurs par plateforme ---
-SELECTORS = {
-    'default': {
-        'email': 'input[type="email"], input[name="email"]',
-        'password': 'input[type="password"]',
-        'login_button': 'button:has-text("Log in")',
-    },
-    'freetron': {
-        # Utilisation de sélecteurs simples et robustes
-        'email': 'input[type="email"]',
-        'password': 'input[type="password"]',
-        'login_button': 'button[type="submit"]:has-text("Log in")',
-    },
-    # Ajoutez d'autres plateformes si nécessaire
-}
-
-def get_selectors(platform):
-    return SELECTORS.get(platform, SELECTORS['default'])
+def wait_for_field(page, selector: str, platform: str, field_name: str, timeout: int = 30000):
+    """
+    Attend qu'un champ soit visible et interactif.
+    Pour les plateformes React, ajoute une pause d'hydratation après détection.
+    """
+    print(f"⏳ Attente du champ {field_name} ({platform})...")
+    try:
+        page.wait_for_selector(selector, state="visible", timeout=timeout)
+        # Pause hydratation React : laisse le framework finir de monter les composants
+        if platform in REACT_PLATFORMS:
+            time.sleep(2.0)
+        else:
+            time.sleep(0.5)
+    except Exception as e:
+        raise RuntimeError(f"Champ {field_name} introuvable sur {platform} après {timeout}ms : {e}")
 
 def login_page_action(page, email: str, password: str, platform: str):
-    if verify_login_success(page):
+    selectors = get_selectors(platform)
+    email_sel    = selectors["email"]
+    password_sel = selectors["password"]
+    btn_sel      = selectors["login_btn"]
+
+    # Vérification cookie persistant
+    if verify_login_success(page, platform):
         print("✅ Déjà connecté via cookie persistant")
         return True
 
-    selectors = get_selectors(platform)
-    email_selector = selectors['email']
-    password_selector = selectors['password']
-    login_button_selector = selectors['login_button']
+    # --- Attente et remplissage email ---
+    wait_for_field(page, email_sel, platform, "email")
+    human_fill(page, email_sel, email, 'email')
 
-    # Attendre explicitement que le champ email soit présent dans le DOM (pas nécessairement visible)
-    print("⏳ Attente du champ email...")
+    # --- Attente et remplissage password ---
+    wait_for_field(page, password_sel, platform, "password")
+    human_fill(page, password_sel, password, 'password')
+
+    # --- Sélection du captcha Turnstile ---
     try:
-        # Utiliser state="attached" pour attendre la présence dans le DOM
-        page.wait_for_selector(email_selector, state="attached", timeout=30000)
-        # Petit délai pour laisser le champ devenir interactif
-        time.sleep(1)
-    except Exception as e:
-        print(f"❌ Champ email introuvable dans le DOM : {e}")
-        # Tentative de diagnostic : afficher le HTML de la page
-        html = page.content()
-        print("HTML partiel :", html[:2000])
+        page.wait_for_selector("select", state="visible", timeout=10000)
+        if platform in REACT_PLATFORMS:
+            time.sleep(1.0)  # stabilisation React
+        options = page.eval_on_selector_all(
+            "select option",
+            "opts => opts.map(o => ({ text: o.textContent.trim(), value: o.value }))"
+        )
+        turnstile_value = next(
+            (o["value"] for o in options if o["text"] == "Cloudflare Turnstile"), None
+        )
+        if not turnstile_value:
+            raise RuntimeError("Option Cloudflare Turnstile introuvable dans le <select>")
+        print("🔍 Sélection de Cloudflare Turnstile...")
+        page.select_option("select", turnstile_value)
+        time.sleep(2)
+    except RuntimeError:
         raise
+    except Exception as e:
+        print(f"⚠️ Impossible de sélectionner le captcha : {e}")
 
-    human_fill(page, email_selector, email, 'email')
-    human_fill(page, password_selector, password, 'password')
+    # --- Scroll vers le bouton login ---
+    scroll_to_element(page, btn_sel)
 
-    select_selector = "select"
-    page.wait_for_selector(select_selector, timeout=10000)
-    options = page.eval_on_selector_all(f"{select_selector} option",
-        "opts => opts.map(o => ({ text: o.textContent.trim(), value: o.value }))")
-    turnstile_value = next((o["value"] for o in options if o["text"] == "Cloudflare Turnstile"), None)
-    if not turnstile_value:
-        raise RuntimeError("Option Cloudflare Turnstile introuvable")
-    print("🔍 Sélection de Cloudflare Turnstile...")
-    page.select_option(select_selector, turnstile_value)
-    time.sleep(2)
-
-    scroll_to_element(page, login_button_selector)
-
-    # 3 tentatives de résolution
+    # --- 3 tentatives de résolution Turnstile ---
     solved = False
     for attempt in range(1, 4):
         print(f"--- Tentative {attempt}/3 de résolution du Turnstile ---")
@@ -303,32 +354,45 @@ def login_page_action(page, email: str, password: str, platform: str):
         print("❌ Échec du Turnstile après 3 tentatives")
         return False
 
-    # Connexion
-    scroll_to_element(page, login_button_selector)
-    login_btn = page.wait_for_selector(login_button_selector, timeout=5000)
-    login_btn.click()
+    # --- Clic sur le bouton de connexion ---
+    scroll_to_element(page, btn_sel)
+    try:
+        login_btn = page.wait_for_selector(btn_sel, state="visible", timeout=5000)
+        login_btn.click()
+    except Exception as e:
+        raise RuntimeError(f"Bouton de connexion introuvable ({btn_sel}) : {e}")
+
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
     except:
         print("⚠️ Navigation lente, attente supplémentaire...")
     time.sleep(5)
 
-    if verify_login_success(page):
+    # --- Vérification finale ---
+    if verify_login_success(page, platform):
         print("✅ Connexion réussie")
         return True
     else:
         try:
-            error = page.evaluate("""() => {
-                const alert = document.querySelector('#signupAlert');
-                if (alert && alert.textContent.trim()) return alert.textContent.trim();
-                const danger = document.querySelector('.alert-danger');
-                return danger ? danger.textContent.trim() : 'Aucun message';
-            }""")
+            if platform in REACT_PLATFORMS:
+                error = page.evaluate("""() => {
+                    const alert = document.querySelector('[role="alert"]');
+                    if (alert && alert.textContent.trim()) return alert.textContent.trim();
+                    const toast = document.querySelector('[data-sonner-toast][data-type="error"]');
+                    return toast ? toast.textContent.trim() : 'Aucun message React';
+                }""")
+            else:
+                error = page.evaluate("""() => {
+                    const alert = document.querySelector('#signupAlert');
+                    if (alert && alert.textContent.trim()) return alert.textContent.trim();
+                    const danger = document.querySelector('.alert-danger');
+                    return danger ? danger.textContent.trim() : 'Aucun message';
+                }""")
         except:
             error = "Erreur inconnue"
-        raise RuntimeError(f"Échec de connexion : {error}")
+        raise RuntimeError(f"Échec de connexion sur {platform} : {error}")
 
-# --- Sauvegarde GitHub ---
+# ---------- Sauvegarde GitHub ----------
 def get_github_client():
     return Github(auth=Auth.Token(GH_TOKEN))
 
@@ -413,7 +477,7 @@ def update_global_accounts(new_entry: dict) -> None:
             else:
                 raise
 
-# --- Main ---
+# ---------- Main ----------
 def main():
     normalized_email = EMAIL.strip().lower()
     video_path = VIDEOS_DIR / f"login_{normalized_email.replace('@', '_').replace('.', '_')}.mp4"
@@ -431,14 +495,14 @@ def main():
 
         login_urls = {
             "tronpick": "https://tronpick.io/login.php",
-            "tronlux": "https://freetron.in/login",
+            "tronlux":  "https://freetron.in/login",
             "litepick": "https://litepick.io/login.php",
             "dogepick": "https://dogepick.io/login.php",
-            "solpick": "https://solpick.io/login.php",
-            "bnbpick": "https://bnbpick.io/login.php",
-            "tonpick": "https://tonpick.game/login.php",
-            "suipick": "https://suipick.io/login.php",
-            "polpick": "https://polpick.io/login.php",
+            "solpick":  "https://solpick.io/login.php",
+            "bnbpick":  "https://bnbpick.io/login.php",
+            "tonpick":  "https://tonpick.game/login.php",
+            "suipick":  "https://suipick.io/login.php",
+            "polpick":  "https://polpick.io/login.php",
         }
         login_url = login_urls.get(PLATFORM, f"https://{PLATFORM}.io/login.php")
 
@@ -449,12 +513,13 @@ def main():
             proxy=proxy_dict,
         ) as browser:
             page = browser.new_page()
+            print(f"🌐 Navigation vers {login_url}...")
             page.goto(login_url, wait_until="networkidle", timeout=60000)
 
-            # Attente supplémentaire plus longue pour freetron
-            if PLATFORM == 'freetron':
-                print("⏳ Attente supplémentaire pour freetron (10s)...")
-                time.sleep(10)
+            # Pause supplémentaire pour les SPA React avant toute interaction
+            if PLATFORM in REACT_PLATFORMS:
+                print(f"⏳ Attente hydratation React pour {PLATFORM}...")
+                time.sleep(3.0)
 
             success = login_page_action(page, normalized_email, PASSWORD, PLATFORM)
             if not success:
@@ -463,25 +528,42 @@ def main():
             cookies = page.context.cookies()
             print(f"🍪 Cookies récupérés : {len(cookies)}")
 
+            # --- Lecture du solde ---
             initial_balance = 0.0
-            try:
-                balance_el = page.wait_for_selector('[class*="balance"]', timeout=5000)
-                balance_text = balance_el.inner_text()
-                initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
-            except:
+            balance_selectors = [
+                '[class*="balance"]',
+                '[id*="balance"]',
+                '[data-balance]',
+            ]
+            balance_found = False
+            for bal_sel in balance_selectors:
                 try:
-                    page.goto(f"https://{PLATFORM}.io/faucet.php", wait_until="networkidle", timeout=30000)
+                    balance_el = page.wait_for_selector(bal_sel, timeout=5000)
+                    balance_text = balance_el.inner_text()
+                    initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
+                    balance_found = True
+                    break
+                except:
+                    continue
+
+            if not balance_found:
+                try:
+                    faucet_url = f"https://freetron.in/faucet" if PLATFORM == "tronlux" else f"https://{PLATFORM}.io/faucet.php"
+                    page.goto(faucet_url, wait_until="networkidle", timeout=30000)
                     time.sleep(5)
-                    balance_el = page.query_selector('[class*="balance"]')
-                    if balance_el:
-                        balance_text = balance_el.inner_text()
-                        initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
+                    for bal_sel in balance_selectors:
+                        balance_el = page.query_selector(bal_sel)
+                        if balance_el:
+                            balance_text = balance_el.inner_text()
+                            initial_balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
+                            break
                 except Exception as e:
                     print(f"⚠️ Impossible de lire le solde : {e}")
 
         stop_ffmpeg(ffmpeg_proc)
+        ffmpeg_proc = None
 
-        # Sauvegarde GitHub
+        # --- Récupération du compte existant ---
         g = get_github_client()
         repo = g.get_repo(f"{GH_USERNAME}/{GH_REPO}")
         existing_account = None

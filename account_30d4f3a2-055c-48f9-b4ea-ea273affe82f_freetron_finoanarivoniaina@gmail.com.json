@@ -7,9 +7,11 @@
   "cookies": "bbcc034bb191c6c311d0925f2b8f8af1:bea82bcaf2a87ef621046ada3efd7d0d",
   "cookiesStatus": "valid",
   "lastClaim": 1788602064580,
-  "timer": 1.0,
+  "timer": 1,
   "createdAt": 1788602064580,
-  "initialBalance": 0.0,
+  "initialBalance": 0,
   "totalClaims": 0,
-  "finalBalance": 0.0
+  "finalBalance": 0,
+  "pendingClaim": true,
+  "pendingClaimSince": 1788602128299
 }

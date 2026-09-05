@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
-Version finale : capture vidéo + détection robuste + inspection boutons
+Version finale corrigée : clic fiable sur le bouton Claim
 """
 
 import os, sys, json, time, random, base64, subprocess
@@ -259,7 +259,6 @@ def claim_with_cookies(account: dict):
         try:
             print(f"--- Tentative claim {attempt}/3 ---")
 
-            # Toujours démarrer la capture vidéo
             ffmpeg_proc = start_ffmpeg(video_path)
             time.sleep(1.5)
 
@@ -314,7 +313,6 @@ def claim_with_cookies(account: dict):
                 ]
 
                 claim_btn = None
-                claim_x = claim_y = None
 
                 for sel in claim_btn_selectors:
                     try:
@@ -333,14 +331,12 @@ def claim_with_cookies(account: dict):
                             continue
 
                         claim_btn = el
-                        claim_x = box["x"] + box["width"] / 2
-                        claim_y = box["y"] + box["height"] / 2
-                        print(f"✅ Bouton Claim trouvé → {sel} à ({claim_x:.0f}, {claim_y:.0f})")
+                        print(f"✅ Bouton Claim trouvé → {sel}")
                         break
                     except Exception:
                         continue
 
-                # ─────────────── Aucun bouton trouvé → Inspection complète ───────────────
+                # ─────────────── Aucun bouton trouvé → Inspection ───────────────
                 if not claim_btn:
                     print("⏳ Aucun bouton Claim cliquable trouvé → Inspection de tous les boutons...")
 
@@ -367,7 +363,7 @@ def claim_with_cookies(account: dict):
                             });
                         }""")
 
-                        print(f"🔍 {len(buttons_info)} éléments de type bouton trouvés sur la page :")
+                        print(f"🔍 {len(buttons_info)} éléments de type bouton trouvés :")
                         for i, b in enumerate(buttons_info, 1):
                             status = []
                             if b["disabled"]:
@@ -380,7 +376,6 @@ def claim_with_cookies(account: dict):
                     except Exception as e:
                         print(f"⚠️ Impossible d'inspecter les boutons : {e}")
 
-                    # Lecture du timer
                     minutes_left = extract_timer(page)
                     if minutes_left is not None and minutes_left < 60:
                         minutes_left = 60
@@ -396,13 +391,13 @@ def claim_with_cookies(account: dict):
                     print(f"🎥 Vidéo sauvegardée : {video_path}")
                     return {"success": False, "message": f"Claim déjà fait, dispo dans {wait_time:.1f} min"}
 
-                # Scroll vers le bouton
+                # ─────────────── Scroll + Clic fiable ───────────────
                 page.evaluate("""(el) => {
                     el.style.display = 'inline-block';
                     el.style.visibility = 'visible';
                     el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }""", claim_btn)
-                time.sleep(2)
+                time.sleep(2.5)
 
                 # ─────────────── Résolution Turnstile ───────────────
                 print("🔍 Résolution Turnstile intelligente...")
@@ -434,10 +429,23 @@ def claim_with_cookies(account: dict):
                 print("✅ Turnstile résolu")
                 time.sleep(2)
 
-                # Clic sur Claim
-                print("🖱️ Clic sur le bouton Claim")
-                ananana.move_mouse_to(page, claim_x, claim_y)
-                page.mouse.click(claim_x, claim_y)
+                # ─────────────── Clic fiable sur le bouton Claim ───────────────
+                print("🖱️ Clic sur le bouton Claim (méthode élément)")
+                try:
+                    # Méthode la plus fiable
+                    claim_btn.click(timeout=8000)
+                    print("✅ Clic élément réussi")
+                except Exception as e:
+                    print(f"⚠️ Clic élément échoué ({e}), fallback souris...")
+                    box = claim_btn.bounding_box()
+                    if box and box["width"] > 5 and box["height"] > 5:
+                        claim_x = box["x"] + box["width"] / 2
+                        claim_y = box["y"] + box["height"] / 2
+                        print(f"📍 Position fallback → ({claim_x:.0f}, {claim_y:.0f})")
+                        ananana.move_mouse_to(page, claim_x, claim_y)
+                        page.mouse.click(claim_x, claim_y)
+                    else:
+                        raise RuntimeError("Impossible de cliquer sur le bouton Claim")
 
                 # Attente résultat
                 try:

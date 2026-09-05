@@ -131,5 +131,12 @@
     "timestamp": 1788625451293,
     "success": false,
     "bonus": 0
+  },
+  {
+    "email": "rivoniainafinoana123@gmail.com",
+    "platform": "tronpick",
+    "timestamp": 1788627113653,
+    "success": true,
+    "bonus": 0.011
   }
 ]

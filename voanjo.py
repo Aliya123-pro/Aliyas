@@ -206,7 +206,7 @@ def claim_with_cookies(account: dict):
         "tonpick": "https://tonpick.game/faucet.php",
         "suipick": "https://suipick.io/faucet.php",
         "polpick": "https://polpick.io/faucet.php",
-        "tronlux": "https://tronlux.io/faucet.php",
+        "freetron": "https://freetron.in/login",
     }
     faucet_url = faucet_urls.get(CLAIM_PLATFORM, "https://tronpick.io/faucet.php")
 

@@ -2,6 +2,7 @@
 """
 test_login_workflow.py – Autologin AVEC proxy
 Priorité Turnstile (ananana.py), fallback IconCaptcha (ravitoto.py - optionnel)
++ Clic Login robuste
 """
 
 import os
@@ -354,7 +355,7 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
         else:
             print("⚠️ Turnstile non résolu...")
 
-    # Fallback IconCaptcha (seulement si disponible)
+    # Fallback IconCaptcha
     icon_opt = next((o for o in options if o.get("text") == "IconCaptcha"), None)
     if not captcha_solved and icon_opt and HAS_RAVITOTO:
         print("🔍 Tentative IconCaptcha...")
@@ -379,22 +380,46 @@ def login_page_action(page, email: str, password: str, platform: str) -> bool:
         print("⚠️ IconCaptcha demandé mais module ravitoto absent")
 
     if not captcha_solved and options:
-        # Si aucun captcha n'a été résolu mais qu'il y avait des options, on continue quand même
-        # (certains sites n'ont plus de captcha obligatoire)
         print("⚠️ Aucun captcha résolu, tentative de login quand même...")
 
-    # Clic sur Log in
+    # ─────────────── Clic robuste sur le bouton Login ───────────────
     login_btn_sel = (
         '#process_login, '
         'button:has-text("Log in"), '
         'button:has-text("LOGIN"), '
         'button:has-text("Login"), '
+        'button:has-text("Sign in"), '
         'button[type="submit"], '
         'input[type="submit"]'
     )
-    scroll_to_element(page, login_btn_sel)
-    login_btn = page.wait_for_selector(login_btn_sel, timeout=8000)
-    login_btn.click()
+
+    print("🖱️ Clic sur le bouton Login...")
+    time.sleep(3)  # laisser le Turnstile se stabiliser
+
+    login_btn = page.wait_for_selector(login_btn_sel, timeout=10000)
+
+    try:
+        login_btn.click(timeout=10000)
+        print("✅ Clic Login réussi (méthode normale)")
+    except Exception as e1:
+        print(f"⚠️ Clic normal échoué : {e1}")
+
+        try:
+            login_btn.click(force=True, timeout=8000)
+            print("✅ Clic Login réussi (force=True)")
+        except Exception as e2:
+            print(f"⚠️ Clic force échoué : {e2}")
+
+            box = login_btn.bounding_box()
+            if box:
+                x = box["x"] + box["width"] / 2
+                y = box["y"] + box["height"] / 2
+                print(f"🖱️ Fallback souris à ({x:.0f}, {y:.0f})")
+                ananana.move_mouse_to(page, x, y)
+                page.mouse.click(x, y)
+                print("✅ Clic Login réussi (souris)")
+            else:
+                raise RuntimeError("Impossible de cliquer sur le bouton Login")
 
     try:
         page.wait_for_load_state("networkidle", timeout=60000)
@@ -419,7 +444,6 @@ def main():
     ffmpeg_proc = None
 
     try:
-        # Gestion du proxy
         proxy_dict = None
         if JP_PROXY_LIST:
             proxy_url = JP_PROXY_LIST[PROXY_INDEX] if PROXY_INDEX < len(JP_PROXY_LIST) else JP_PROXY_LIST[0]
@@ -467,7 +491,6 @@ def main():
                 print("❌ Aucun cookie récupéré → échec")
                 raise RuntimeError("Aucun cookie récupéré après login")
 
-            # Lecture du solde
             initial_balance = 0.0
             try:
                 balance_el = page.wait_for_selector('[class*="balance"]', timeout=5000)
@@ -488,7 +511,6 @@ def main():
         stop_ffmpeg(ffmpeg_proc)
         ffmpeg_proc = None
 
-        # Sauvegarde
         g = get_github_client()
         repo = g.get_repo(f"{GH_USERNAME}/{GH_REPO}")
 

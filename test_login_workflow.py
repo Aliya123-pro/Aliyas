@@ -3,7 +3,7 @@
 Bot de login avec Camoufox (Firefox furtif).
 Résolution Turnstile automatique – détection du succès par absence d'erreur
 et absence de 'login.php' dans l'URL après connexion.
-Version adaptée pour gérer différentes plateformes (sélecteurs dynamiques).
+Version corrigée pour gérer les chargements dynamiques (freetron).
 """
 
 import os, sys, json, time, random, subprocess, base64
@@ -229,8 +229,7 @@ def scroll_to_element(page, selector):
     except:
         pass
 
-# --- Dictionnaire des sélecteurs par plateforme ---
-# Ajustez ces sélecteurs si la structure change. Utilisez plusieurs sélecteurs séparés par des virgules.
+# --- Sélecteurs par plateforme (ajustez si nécessaire) ---
 SELECTORS = {
     'default': {
         'email': 'input[type="email"], input[name="email"]',
@@ -238,19 +237,11 @@ SELECTORS = {
         'login_button': 'button:has-text("Log in")',
     },
     'freetron': {
-        # Sélecteurs à adapter selon la vraie page de freetron.in/login
-        # Exemple : le champ email peut être de type text ou avoir un id spécifique
-        'email': 'input[type="text"][name="email"], input#email, input[name="email"], input[type="email"]',
-        'password': 'input[type="password"]',
-        'login_button': 'button:has-text("Log in"), button:has-text("Login"), button:has-text("Sign in")',
+        'email': 'input[type="email"][name="email"]',
+        'password': 'input[type="password"][name="password"]',
+        'login_button': 'button[type="submit"]:has-text("Log in")',
     },
-    # Vous pouvez ajouter d'autres plateformes ici
-    'tronpick': {
-        'email': 'input[type="email"], input[name="email"]',
-        'password': 'input[type="password"]',
-        'login_button': 'button:has-text("Log in")',
-    },
-    # etc.
+    # Ajoutez d'autres plateformes si nécessaire
 }
 
 def get_selectors(platform):
@@ -265,6 +256,14 @@ def login_page_action(page, email: str, password: str, platform: str):
     email_selector = selectors['email']
     password_selector = selectors['password']
     login_button_selector = selectors['login_button']
+
+    # Attendre explicitement que le champ email soit visible (timeout 30s)
+    print("⏳ Attente du champ email...")
+    try:
+        page.wait_for_selector(email_selector, state="visible", timeout=30000)
+    except Exception as e:
+        print(f"❌ Champ email introuvable : {e}")
+        raise
 
     human_fill(page, email_selector, email, 'email')
     human_fill(page, password_selector, password, 'password')
@@ -445,9 +444,10 @@ def main():
             page = browser.new_page()
             page.goto(login_url, wait_until="networkidle", timeout=60000)
 
-            # Attente supplémentaire pour les sites qui chargent dynamiquement le formulaire
+            # Attente supplémentaire pour les plateformes à chargement dynamique
             if PLATFORM == 'freetron':
-                time.sleep(3)  # ou page.wait_for_load_state('domcontentloaded')
+                print("⏳ Attente supplémentaire pour freetron (5s)...")
+                time.sleep(5)
 
             success = login_page_action(page, normalized_email, PASSWORD, PLATFORM)
             if not success:

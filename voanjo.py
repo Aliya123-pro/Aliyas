@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 voanjo.py – Claim des faucet avec cookies (Camoufox + Turnstile)
-Version finale corrigée : clic fiable sur le bouton Claim
+Version finale : multi-langue + détection login robuste + timer 5min en échec
 """
 
 import os, sys, json, time, random, base64, subprocess
@@ -38,7 +38,6 @@ if not all([CRYPTO_SECRET, USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, JP_PROXY_LIST])
 
 USER_FILE = f"account_{USER_ID}_{CLAIM_PLATFORM}_{CLAIM_EMAIL}.json"
 
-# Dossier vidéos
 VIDEOS_DIR = Path(__file__).parent / "videos"
 VIDEOS_DIR.mkdir(exist_ok=True)
 
@@ -102,19 +101,12 @@ def parse_proxy_url(proxy_url: str) -> Optional[Dict[str, str]]:
         host, port = proxy_url.split(":")
         return {"server": f"{protocol}://{host}:{port}", "username": None, "password": None}
 
-# --- Capture vidéo ---
 def start_ffmpeg(video_path: str):
     display = os.environ.get("DISPLAY", ":99")
     args = [
-        "ffmpeg",
-        "-f", "x11grab",
-        "-video_size", "1280x720",
-        "-i", display,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",
-        "-crf", "28",
-        "-pix_fmt", "yuv420p",
-        "-y", video_path,
+        "ffmpeg", "-f", "x11grab", "-video_size", "1280x720",
+        "-i", display, "-c:v", "libx264", "-preset", "ultrafast",
+        "-crf", "28", "-pix_fmt", "yuv420p", "-y", video_path,
     ]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print(f"🎥 FFmpeg démarré → {video_path}")
@@ -151,20 +143,11 @@ def save_account(account_data: dict) -> None:
                 if e.status != 404:
                     raise
             if sha:
-                repo.update_file(
-                    path=USER_FILE,
-                    message=f"Mise à jour compte {CLAIM_EMAIL}",
-                    content=content,
-                    branch=GH_BRANCH,
-                    sha=sha,
-                )
+                repo.update_file(path=USER_FILE, message=f"Mise à jour compte {CLAIM_EMAIL}",
+                                 content=content, branch=GH_BRANCH, sha=sha)
             else:
-                repo.create_file(
-                    path=USER_FILE,
-                    message=f"Mise à jour compte {CLAIM_EMAIL}",
-                    content=content,
-                    branch=GH_BRANCH,
-                )
+                repo.create_file(path=USER_FILE, message=f"Mise à jour compte {CLAIM_EMAIL}",
+                                 content=content, branch=GH_BRANCH)
             print("💾 Sauvegarde réussie")
             return
         except GithubException as e:
@@ -179,11 +162,9 @@ def add_history_entry(user_id, email, platform, success, bonus=0):
     repo = g.get_repo(f"{GH_USERNAME}/{GH_REPO}")
     history_file = f"history_{user_id}.json"
     entry = {
-        "email": email,
-        "platform": platform,
+        "email": email, "platform": platform,
         "timestamp": int(time.time() * 1000),
-        "success": success,
-        "bonus": bonus
+        "success": success, "bonus": bonus
     }
     try:
         sha = None
@@ -231,6 +212,27 @@ def extract_timer(page):
     except:
         return None
 
+def is_login_page(page) -> bool:
+    """Détection robuste de la page de login (multi-sites)"""
+    try:
+        url = page.url.lower()
+        if "login" in url or "signin" in url or "auth" in url:
+            return True
+        # Présence d'un champ password visible
+        pwd = page.query_selector('input[type="password"]')
+        if pwd:
+            box = pwd.bounding_box()
+            if box and box["width"] > 0:
+                return True
+        # Texte typique de login
+        body_text = page.inner_text("body").lower()
+        if any(x in body_text for x in ["sign in", "log in", "login", "connexion", "se connecter"]):
+            if page.query_selector('input[type="email"], input[name*="email"], input[name*="user"]'):
+                return True
+    except:
+        pass
+    return False
+
 def claim_with_cookies(account: dict):
     faucet_urls = {
         "tronpick": "https://tronpick.io/faucet.php",
@@ -258,19 +260,13 @@ def claim_with_cookies(account: dict):
     for attempt in range(1, 4):
         try:
             print(f"--- Tentative claim {attempt}/3 ---")
-
             ffmpeg_proc = start_ffmpeg(video_path)
             time.sleep(1.5)
 
-            with Camoufox(
-                headless=False,
-                humanize=True,
-                geoip=True,
-                proxy=proxy_dict,
-            ) as browser:
+            with Camoufox(headless=False, humanize=True, geoip=True, proxy=proxy_dict) as browser:
                 page = browser.new_page()
 
-                # Injection des cookies
+                # Injection cookies
                 cookies_data = account.get("cookies")
                 if cookies_data:
                     decrypted = decrypt_cookies(cookies_data)
@@ -283,63 +279,76 @@ def claim_with_cookies(account: dict):
                 page.goto(faucet_url, wait_until="networkidle", timeout=90000)
                 time.sleep(12)
 
-                if "login.php" in page.url:
-                    print("❌ Cookies expirés")
+                # ── Détection login robuste ──
+                if is_login_page(page):
+                    print("❌ Cookies expirés ou page de login détectée")
                     account["cookiesStatus"] = "expired"
                     account["lastClaim"] = int(time.time() * 1000)
-                    account["timer"] = 120
+                    account["timer"] = 5          # ← 5 min pour réessayer vite
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
                     stop_ffmpeg(ffmpeg_proc)
                     print(f"🎥 Vidéo sauvegardée : {video_path}")
-                    return {"success": False, "message": "Cookies expirés"}
+                    return {"success": False, "message": "Cookies expirés / page login"}
 
                 print("✅ Session valide")
                 account["cookiesStatus"] = "valid"
 
-                # ─────────────── Détection robuste du bouton Claim ───────────────
+                # ── Sélecteurs multi-langue (ID en premier = indépendant de la langue) ──
                 claim_btn_selectors = [
+                    # === Priorité absolue : ID (ne change jamais avec la langue) ===
                     "#process_claim_hourly_faucet",
                     "button#process_claim_hourly_faucet",
                     "input#process_claim_hourly_faucet",
+
+                    # === Classes communes ===
+                    ".btn-claim",
+                    "[onclick*='claim']",
+                    "[onclick*='Claim']",
+
+                    # === Textes multi-langue ===
                     "button:has-text('Claim')",
                     "button:has-text('CLAIM')",
                     "button:has-text('claim')",
-                    ".btn-claim",
-                    "[onclick*='claim']",
-                    "button.btn-primary",
-                    "input[type='submit'][value*='Claim']",
-                    "button[type='submit']",
+                    "button:has-text('Claim Now')",
+                    "button:has-text('CLAIM NOW')",
+                    "button:has-text('Réclamer')",          # Français
+                    "button:has-text('réclamer')",
+                    "button:has-text('Reclamar')",          # Espagnol
+                    "button:has-text('Beanspruchen')",      # Allemand
+                    "button:has-text('Претендовать')",      # Russe
+                    "button:has-text('Claim Reward')",
+                    "button:has-text('Get Reward')",
+
+                    # === Fallbacks plus larges mais encore ciblés ===
+                    "button.btn-primary:has-text('Claim')",
+                    "button[type='submit']:has-text('Claim')",
+                    "button[type='submit']:has-text('Réclamer')",
                 ]
 
                 claim_btn = None
-
                 for sel in claim_btn_selectors:
                     try:
                         el = page.query_selector(sel)
                         if not el:
                             continue
-
                         box = el.bounding_box()
                         if not box or box["width"] < 5 or box["height"] < 5:
                             continue
-
                         is_disabled = page.evaluate(
                             "(el) => el.disabled || el.getAttribute('disabled') !== null", el
                         )
                         if is_disabled:
                             continue
-
                         claim_btn = el
                         print(f"✅ Bouton Claim trouvé → {sel}")
                         break
                     except Exception:
                         continue
 
-                # ─────────────── Aucun bouton trouvé → Inspection ───────────────
+                # ── Aucun bouton → inspection + timer ──
                 if not claim_btn:
-                    print("⏳ Aucun bouton Claim cliquable trouvé → Inspection de tous les boutons...")
-
+                    print("⏳ Aucun bouton Claim trouvé → Inspection...")
                     try:
                         buttons_info = page.evaluate("""() => {
                             const buttons = Array.from(document.querySelectorAll(
@@ -352,9 +361,9 @@ def claim_with_cookies(account: dict):
                                     tag: btn.tagName,
                                     id: btn.id || null,
                                     class: btn.className || null,
-                                    text: (btn.innerText || btn.value || btn.getAttribute('aria-label') || '').trim().substring(0, 80),
-                                    disabled: btn.disabled || btn.getAttribute('disabled') !== null,
-                                    visible: !!(rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'),
+                                    text: (btn.innerText || btn.value || '').trim().substring(0, 80),
+                                    disabled: btn.disabled || false,
+                                    visible: !!(rect.width > 0 && rect.height > 0 && style.display !== 'none'),
                                     width: Math.round(rect.width),
                                     height: Math.round(rect.height),
                                     x: Math.round(rect.x),
@@ -362,36 +371,32 @@ def claim_with_cookies(account: dict):
                                 };
                             });
                         }""")
-
-                        print(f"🔍 {len(buttons_info)} éléments de type bouton trouvés :")
+                        print(f"🔍 {len(buttons_info)} boutons trouvés :")
                         for i, b in enumerate(buttons_info, 1):
                             status = []
-                            if b["disabled"]:
-                                status.append("DISABLED")
-                            if not b["visible"]:
-                                status.append("HIDDEN")
+                            if b["disabled"]: status.append("DISABLED")
+                            if not b["visible"]: status.append("HIDDEN")
                             status_str = f" [{', '.join(status)}]" if status else ""
                             print(f"  {i:2d}. <{b['tag']}> id={b['id']} class=\"{b['class']}\" "
-                                  f"text=\"{b['text']}\" size={b['width']}x{b['height']} pos=({b['x']},{b['y']}){status_str}")
+                                  f"text=\"{b['text']}\" size={b['width']}x{b['height']}{status_str}")
                     except Exception as e:
-                        print(f"⚠️ Impossible d'inspecter les boutons : {e}")
+                        print(f"⚠️ Inspection échouée : {e}")
 
                     minutes_left = extract_timer(page)
-                    if minutes_left is not None and minutes_left < 60:
-                        minutes_left = 60
-                    wait_time = minutes_left if minutes_left is not None else 62
+                    if minutes_left is not None and minutes_left < 5:
+                        minutes_left = 5
+                    wait_time = minutes_left if minutes_left is not None else 5
                     print(f"⏱️ Timer restant : {wait_time:.1f} minutes")
 
                     account["timer"] = wait_time
                     account["lastClaim"] = int(time.time() * 1000)
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
-
                     stop_ffmpeg(ffmpeg_proc)
                     print(f"🎥 Vidéo sauvegardée : {video_path}")
                     return {"success": False, "message": f"Claim déjà fait, dispo dans {wait_time:.1f} min"}
 
-                # ─────────────── Scroll + Clic fiable ───────────────
+                # Scroll
                 page.evaluate("""(el) => {
                     el.style.display = 'inline-block';
                     el.style.visibility = 'visible';
@@ -399,9 +404,8 @@ def claim_with_cookies(account: dict):
                 }""", claim_btn)
                 time.sleep(2.5)
 
-                # ─────────────── Résolution Turnstile ───────────────
-                print("🔍 Résolution Turnstile intelligente...")
-
+                # ── Turnstile ──
+                print("🔍 Résolution Turnstile...")
                 select = page.query_selector("select")
                 if select:
                     options = page.eval_on_selector_all(
@@ -415,11 +419,10 @@ def claim_with_cookies(account: dict):
                         time.sleep(2)
 
                 token_found = ananana.solve_turnstile(page, timeout=35)
-
                 if not token_found:
                     print("❌ Token Turnstile non résolu")
                     account["lastClaim"] = int(time.time() * 1000)
-                    account["timer"] = 2
+                    account["timer"] = 5
                     save_account(account)
                     add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, False, 0)
                     stop_ffmpeg(ffmpeg_proc)
@@ -429,21 +432,19 @@ def claim_with_cookies(account: dict):
                 print("✅ Turnstile résolu")
                 time.sleep(2)
 
-                # ─────────────── Clic fiable sur le bouton Claim ───────────────
-                print("🖱️ Clic sur le bouton Claim (méthode élément)")
+                # ── Clic fiable ──
+                print("🖱️ Clic sur le bouton Claim")
                 try:
-                    # Méthode la plus fiable
                     claim_btn.click(timeout=8000)
                     print("✅ Clic élément réussi")
                 except Exception as e:
                     print(f"⚠️ Clic élément échoué ({e}), fallback souris...")
                     box = claim_btn.bounding_box()
-                    if box and box["width"] > 5 and box["height"] > 5:
-                        claim_x = box["x"] + box["width"] / 2
-                        claim_y = box["y"] + box["height"] / 2
-                        print(f"📍 Position fallback → ({claim_x:.0f}, {claim_y:.0f})")
-                        ananana.move_mouse_to(page, claim_x, claim_y)
-                        page.mouse.click(claim_x, claim_y)
+                    if box and box["width"] > 5:
+                        x = box["x"] + box["width"] / 2
+                        y = box["y"] + box["height"] / 2
+                        ananana.move_mouse_to(page, x, y)
+                        page.mouse.click(x, y)
                     else:
                         raise RuntimeError("Impossible de cliquer sur le bouton Claim")
 
@@ -476,13 +477,14 @@ def claim_with_cookies(account: dict):
                 if result_message:
                     print(f"📢 Message du site : {result_message}")
 
-                is_error = any(word in result_message.lower() for word in ["error", "something went wrong", "try again"])
+                is_error = any(w in result_message.lower() for w in ["error", "something went wrong", "try again", "failed"])
                 btn_disabled_now = page.evaluate("""() => {
                     const btn = document.querySelector('#process_claim_hourly_faucet');
                     return btn ? btn.disabled : false;
                 }""")
 
                 success = (not is_error) and (claim_result != 'timeout' or btn_disabled_now)
+
                 if success:
                     print("✅ Claim réussi")
                 else:
@@ -496,18 +498,17 @@ def claim_with_cookies(account: dict):
                         balance = float("".join(c for c in balance_text if c.isdigit() or c == "."))
                         print(f"💰 Solde après claim : {balance}")
                 except:
-                    print("⚠️ Impossible de lire le solde")
+                    pass
 
                 if success:
                     account["totalClaims"] = account.get("totalClaims", 0) + 1
-                account["finalBalance"] = balance
-                new_timer = extract_timer(page)
-                if new_timer is not None:
-                    if new_timer < 60:
-                        new_timer = 60
-                    account["timer"] = new_timer
+                    new_timer = extract_timer(page)
+                    account["timer"] = max(new_timer or 60, 60)
                 else:
-                    account["timer"] = 62 if not is_error else 120
+                    # ← En cas d'échec on met seulement 5 minutes
+                    account["timer"] = 5
+
+                account["finalBalance"] = balance
                 account["lastClaim"] = int(time.time() * 1000)
                 save_account(account)
                 add_history_entry(USER_ID, CLAIM_EMAIL, CLAIM_PLATFORM, success, balance)

@@ -19,7 +19,7 @@ on:
 jobs:
   claim:
     runs-on: ubuntu-latest
-    timeout-minutes: 6          # un peu plus de marge (vidéo + claim)
+    timeout-minutes: 6
     container:
       image: ghcr.io/aliya123-pro/camoufox-system:latest
       credentials:
@@ -46,10 +46,10 @@ jobs:
           xvfb-run --auto-servernum python voanjo.py
 
       - name: Upload des vidéos
-        if: always()          # même si le claim a échoué
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: claim-videos-\( {{ github.event.inputs.platform }}- \){{ github.event.inputs.email }}
+          name: claim-videos-\( {{ github.event.inputs.platform }}- \){{ github.run_id }}
           path: /app/videos/
           retention-days: 5
           if-no-files-found: warn
